@@ -1,3 +1,4 @@
+#pragma once
 #define TAM 100
 #define NOMEMP TEXT("MP")
 
@@ -15,8 +16,6 @@
 
 #define PIPE_NAME TEXT("\\\\.\\pipe\\clientes")
 
-#define MAX_CLI 5
-
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
 enum PATH { START, END, NORMAL };
 
@@ -27,6 +26,12 @@ typedef struct {
     enum PATH path;//se é o inicio o fim ou um espaço normal
     int agua;//se ja foi prenchido com agua 1 = prenchido, 0 = não prenchido
 }CANO;
+
+typedef struct {
+    int numero;
+    TCHAR nome[TAM];
+}CLIENTE_PIPE;
+
 
 typedef struct {
     unsigned int shutdown; //terminar jogo
@@ -50,27 +55,15 @@ typedef struct {
     DADOS_JOGO dados_jogo;
 }CLIENTE;
 
+
 typedef struct _SharedMem {
     int m; //numero de monitores
 
-    CLIENTE clientes[MAX_CLI];//memoria partilhada do jogo
+    DADOS_JOGO Dados_Partilhados;//memoria partilhada do jogo
 
     TCHAR comandos[10][BUFFER_SIZE];// buffer circular para receber comandos
 
 }SharedMem;
-
-
-
-typedef struct {
-    HANDLE hInstancia;
-    BOOL activo;
-    OVERLAPPED overlap;
-}DADOSPIPES;
-
-typedef struct {
-    DADOSPIPES hPipes[MAX_CLI];
-    HANDLE hEvents[MAX_CLI];
-}PIPES;
 
 typedef struct _ControlData {
     HANDLE hMutex;// mutex
@@ -91,14 +84,4 @@ typedef struct _ControlData {
 
     SharedMem* sharedMem;//memoria partilhada
     DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
-
-    DADOSPIPES* pipe[MAX_CLI];
-
-    
-
-    int c; // numero de clientes
-    int shutdown; // terminar servidor
-    int tam_x; //dimensão x maxima matriz
-    int tam_y; //dimensão y maxima matriz
-    int tempo_fluir; //tempo após o qual a água começa a fluir
 }ControlData;

@@ -25,8 +25,8 @@ void verificar_execução() {
     }
 }
 
-int isNumberArgv(int argc, LPTSTR* argv) {
-    for (int i = 1; i < argc; i++)
+int isNumberArgv(int * argc, LPTSTR* argv) {
+    for (int i = 1; i < *argc; i++)
     {
         for (int j = 0; argv[i][j] != '\0'; j++)
         {
@@ -37,11 +37,11 @@ int isNumberArgv(int argc, LPTSTR* argv) {
     return 1;
 }
 
-void regeditException(DWORD* status, HKEY* chave, TCHAR* nome, TCHAR* caminho, DADOS_JOGO* dados) {
+void regeditException(DWORD* status, HKEY* chave, TCHAR* nome, TCHAR* caminho, ControlData* cData) {
     TCHAR data[3][TAM];
     if (*status == REG_CREATED_NEW_KEY) {
         _tprintf(TEXT("\nParametros inválidos e regedit vazia \n A terminar...."));
-        dados->shutdown = 1;
+        cData->shutdown = 1;
         Sleep(10000);
         exit(-1);
     }
@@ -51,26 +51,26 @@ void regeditException(DWORD* status, HKEY* chave, TCHAR* nome, TCHAR* caminho, D
             DWORD size = sizeof(*(data + i));
             if (RegQueryValueEx(chave, nome[i], NULL, NULL, &data[i], &size) != ERROR_SUCCESS) {
                 _tprintf(TEXT("\nDados na regedit inválidos ou inexistentes"));
-                dados->shutdown = 1;
+                cData->shutdown = 1;
                 Sleep(10000);
                 exit(-1);
             }
             for (int j = 0; data[i][j] != '\0'; j++) {
                 if (isdigit(data[i][j]) == 0) {
                     _tprintf(TEXT("\nParametros da regedit inválidos"));
-                    dados->shutdown = 1;
+                    cData->shutdown = 1;
                     Sleep(10000);
                     exit(-1);
                 }
             }
         }
-        dados->tam_x = _ttoi(*(data + 0));
-        dados->tam_y = _ttoi(*(data + 1));
-        dados->tempo_fluir = _ttoi(*(data + 2));
+        cData->tam_x = _ttoi(*(data + 0));
+        cData->tam_y = _ttoi(*(data + 1));
+        cData->tempo_fluir = _ttoi(*(data + 2));
     }
 }
 
-void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
+void verificar_parametros(int* argc, LPTSTR* argv, ControlData* cData) {
     HKEY chave;
     TCHAR caminho[TAM] = _T("Software\\AULA\\SO2\\TRABALHO\\Game_Info");
     TCHAR data[3][TAM], valor[3][TAM];
@@ -102,7 +102,7 @@ void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
     }
     else {
         _tprintf(TEXT("\nErro a criar ou aceder á chave"));
-        dados->shutdown = 1;
+        cData->shutdown = 1;
         Sleep(10000);
         exit(-1);
     }
@@ -125,12 +125,12 @@ void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
     if (*argc == 4) {
         _tprintf(TEXT("\nParametros da linha de comandos recebidos"));
         if (isNumberArgv(argc, argv)) {
-            dados->tam_x = _ttoi(*(argv + 1));
-            dados->tam_y = _ttoi(*(argv + 2));
-            dados->tempo_fluir = _ttoi(*(argv + 3));
-            wsprintf(valor[0], TEXT("%d"), dados->tam_x);
-            wsprintf(valor[1], TEXT("%d"), dados->tam_y);
-            wsprintf(valor[2], TEXT("%d"), dados->tempo_fluir);
+            cData->tam_x = _ttoi(*(argv + 1));
+            cData->tam_y = _ttoi(*(argv + 2));
+            cData->tempo_fluir = _ttoi(*(argv + 3));
+            wsprintf(valor[0], TEXT("%d"), cData->tam_x);
+            wsprintf(valor[1], TEXT("%d"), cData->tam_y);
+            wsprintf(valor[2], TEXT("%d"), cData->tempo_fluir);
 
             for (int i = 0; i < 3; ++i) {
                 if (RegSetValueEx(chave, nome[i], NULL, REG_SZ, valor[i], TAM) != ERROR_SUCCESS) {
@@ -141,18 +141,18 @@ void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
         else {
             if (cValues != 3) {
                 _tprintf(TEXT("\nParametros da regedit inválidos"));
-                dados->shutdown = 1;
+                cData->shutdown = 1;
                 Sleep(10000);
                 exit(-1);
             }
-            regeditException(&status, &chave, &nome, &caminho, dados);
+            regeditException(&status, &chave, &nome, &caminho, cData);
         }
     }
     else if (*argc == 1) {
 
         if (cValues != 3) {
             _tprintf(TEXT("\nParametros da regedit inválidos"));
-            dados->shutdown = 1;
+            cData->shutdown = 1;
             Sleep(10000);
             exit(-1);
         }
@@ -162,7 +162,7 @@ void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
             DWORD size = sizeof(data[i]);
             if (RegQueryValueEx(chave, nome[i], NULL, NULL, &data[i], &size) != ERROR_SUCCESS) {
                 _tprintf(TEXT("\nDados na regedit inválidos ou inexistentes"));
-                dados->shutdown = 1;
+                cData->shutdown = 1;
                 Sleep(10000);
                 exit(-1);
             }
@@ -170,18 +170,18 @@ void verificar_parametros(int* argc, LPTSTR* argv, DADOS_JOGO* dados) {
             {
                 if (isdigit(data[i][j]) == 0) {
                     _tprintf(TEXT("\nParametros da regedit inválidos"));
-                    dados->shutdown = 1;
+                    cData->shutdown = 1;
                     Sleep(10000);
                     exit(-1);
                 }
             }
         }
-        dados->tam_x = _ttoi(data[0]);
-        dados->tam_y = _ttoi(data[1]);
-        dados->tempo_fluir = _ttoi(data[2]);
+        cData->tam_x = _ttoi(data[0]);
+        cData->tam_y = _ttoi(data[1]);
+        cData->tempo_fluir = _ttoi(data[2]);
     }
     else {
-        regeditException(&status, &chave, &nome, &caminho, dados);
+        regeditException(&status, &chave, &nome, &caminho, cData);
     }
     RegCloseKey(chave);
 }
@@ -322,8 +322,10 @@ void addCano(TCHAR* op[10], DADOS_JOGO* dados) {
 }
 
 void writeMemory(ControlData* cData) {
+
     WaitForSingleObject(cData->hWriteSM, INFINITE);
     ReleaseSemaphore(cData->hReadSM, cData->sharedMem->m, NULL);
+    
 }
 
 void execComando(TCHAR* comando, ControlData* cData) {
@@ -378,7 +380,7 @@ void execComando(TCHAR* comando, ControlData* cData) {
 DWORD WINAPI threadRead(LPVOID a) {
     ControlData* cData = (ControlData*)a;
 
-    while (cData->sharedMem->Dados_Partilhados.shutdown == 0) {
+    while (cData->shutdown == 0) {
         TCHAR comando[TAM];
         WaitForSingleObject(cData->hReadMS, INFINITE);
         WaitForSingleObject(cData->hMutex, INFINITE);
@@ -416,8 +418,8 @@ void memoria_partilhada(ControlData* cData, HANDLE* hMapFile) {
     }
 
     if (first) {
-        cData->sharedMem->Dados_Partilhados.shutdown = 0;
-        cData->sharedMem->m = 0;
+        cData->shutdown = 0;
+        cData->sharedMem->m = 1;
     }
 
 
@@ -462,20 +464,20 @@ BOOL verificaContinuidade(enum Direction d1, enum Direction d2) {
 }
 
 DWORD WINAPI aguaFluir(LPVOID a) {
-    ControlData* cData = (ControlData*)a;
-    Sleep(cData->dados->tempo_fluir);
+    DADOS_JOGO* dados = (DADOS_JOGO*)a;
+    Sleep(dados->tempo_fluir);
     _tprintf(TEXT("\nÁgua começou fluir"));
-    cData->dados->code = 1;
+    dados->code = 1;
 
-    while (cData->dados->shutdown == 0) {
+    while (dados->shutdown == 0) {
         enum Direction aux_change_order;
         int pos_entrada = -1;
 
-        int y = cData->dados->agua_posY, x = cData->dados->agua_posX;
+        int y = dados->agua_posY, x = dados->agua_posX;
 
 
 
-        switch (cData->dados->mapa[y][x].entrada_possiveis[1]) {
+        switch (dados->mapa[y][x].entrada_possiveis[1]) {
         case UP:
             y--;
             break;
@@ -494,47 +496,48 @@ DWORD WINAPI aguaFluir(LPVOID a) {
             //verifica se na pos seguinte tem uma entrada posivel que é contraria a saida pos atual
             //se tiver a 0 essa entrada deixa o array como esta
             //se não estiver modifica o array colocando a entrada na pos[0] e a saida na pos[1] ficilitando na proxima iteração
-            if (verificaContinuidade(cData->dados->mapa[cData->dados->agua_posY][cData->dados->agua_posX].entrada_possiveis[1], cData->dados->mapa[y][x].entrada_possiveis[i])) {
+            if (verificaContinuidade(dados->mapa[dados->agua_posY][dados->agua_posX].entrada_possiveis[1], dados->mapa[y][x].entrada_possiveis[i])) {
                 pos_entrada = i;
-                cData->dados->agua_posY = y;
-                cData->dados->agua_posX = x;
-                cData->dados->mapa[y][x].agua = 1;
-                if (y == (cData->dados->ep_y - 1) && x == (cData->dados->ep_x - 1)) {
+                dados->agua_posY = y;
+                dados->agua_posX = x;
+                dados->mapa[y][x].agua = 1;
+                if (y == (dados->ep_y - 1) && x == (dados->ep_x - 1)) {
                     _tprintf(TEXT("\nGanhou jogo"));
-                    cData->dados->code = 3;
-                    cData->dados->shutdown = 1;
+                    dados->code = 3;
+                    dados->shutdown = 1;
+                    /*
                     ReleaseMutex(cData->hMutex);
-                    ReleaseSemaphore(cData->hReadMS, 1, NULL);
+                    ReleaseSemaphore(cData->hReadMS, 1, NULL);*/
                 }
                 break;
             }
         }
         if (pos_entrada == 1) {
-            aux_change_order = cData->dados->mapa[cData->dados->agua_posY][cData->dados->agua_posX].entrada_possiveis[0];
-            cData->dados->mapa[cData->dados->agua_posY][cData->dados->agua_posX].entrada_possiveis[0] = cData->dados->mapa[cData->dados->agua_posY][cData->dados->agua_posX].entrada_possiveis[1];
-            cData->dados->mapa[cData->dados->agua_posY][cData->dados->agua_posX].entrada_possiveis[1] = aux_change_order;
+            aux_change_order = dados->mapa[dados->agua_posY][dados->agua_posX].entrada_possiveis[0];
+            dados->mapa[dados->agua_posY][dados->agua_posX].entrada_possiveis[0] = dados->mapa[dados->agua_posY][dados->agua_posX].entrada_possiveis[1];
+            dados->mapa[dados->agua_posY][dados->agua_posX].entrada_possiveis[1] = aux_change_order;
         }
         else if (pos_entrada == -1) {
             _tprintf(TEXT("\nPerdeu jogo"));
-            cData->dados->code = 2;
-            cData->dados->shutdown = 1;
+            dados->code = 2;
+            dados->shutdown = 1;
         }
-        writeMemory(cData);
-        cData->dados->code = 0;
+        //writeMemory(cData);
+        dados->code = 0;
         Sleep(4000);
     }
 }
 
-void inicializarEstrutura(DADOS_JOGO* dados_jogo) {
+void inicializarEstrutura(ControlData * cData, DADOS_JOGO* dados_jogo) {
     dados_jogo->agua_posX = 0;
     dados_jogo->agua_posY = 0;
     dados_jogo->ep_x = 0;
     dados_jogo->ep_y = 0;
     dados_jogo->sp_x = 0;
     dados_jogo->sp_y = 0;
-    dados_jogo->tam_x = 0;
-    dados_jogo->tam_y = 0;
-    dados_jogo->tempo_fluir = 0;
+    dados_jogo->tam_x = cData->tam_x;
+    dados_jogo->tam_y = cData->tam_y;
+    dados_jogo->tempo_fluir = cData->tempo_fluir;
     dados_jogo->modoAleatorio = FALSE;
     for (int i = 0; i < 20; i++)
     {
@@ -580,6 +583,176 @@ void iniciarSemaforoMutex(ControlData* cData) {
     }
 }
 
+
+/*
+void threadConsola(ThreadDados* d) {
+    TCHAR nome[256];
+    DWORD n;
+    int i;
+    BOOL ret;
+    ThreadDados* dados = (ThreadDados*)d;
+
+    do {
+        /*
+        _tprintf(TEXT("[ESCRITOR] Frase: "));
+        _fgetts(buf, 256, stdin);
+        buf[_tcslen(buf) - 1] = '\0';
+        for (i = 0; i < MAX_CLI; i++) {
+            WaitForSingleObject(dados->hMutex, INFINITE);
+            if (dados->hPipes[i].activo) {
+                /*
+                if (!WriteFile(dados->hPipes[i].hInstancia, buf, _tcslen(buf) * sizeof(TCHAR), &n, NULL))
+                    _tprintf(TEXT("[ERRO] Escrever no pipe! (WriteFile)\n"));
+                else {
+                    _tprintf(TEXT("[ESCRITOR] Enviei %d bytes ao leitor [%d]... (WriteFile)\n"), n, i);
+                    
+                ret = ReadFile(dados->hPipes[i].hInstancia, nome, sizeof(nome), &n, NULL);
+                _tprintf(TEXT("[ESCRITOR] Recebi %d bytes: '%s'... (ReadFile)\n"), n, nome);
+                //}
+            }
+            ReleaseMutex(dados->hMutex);
+        }
+    } while (_tcscmp(nome, TEXT("FIM")));
+    for (i = 0; i < MAX_CLI; i++)
+        SetEvent(dados->hEvents[i]);
+    return 0;
+}*/
+
+void threadCliente(LPVOID* d) {
+    _tprintf(TEXT("ENMTREI"));
+    ControlData* cData = (ControlData*)d;
+    DWORD n;
+    int i;
+    BOOL ret;
+
+    cData->hThreads[0] = NULL;
+    cData->hThreads[1] = NULL;
+
+    
+    WaitForSingleObject(cData->hMutex, INFINITE);
+    CLIENTE* cliente = &cData->sharedMem->clientes[cData->c - 1];
+    cliente->numero = cData->c-1;
+    
+    ret = ReadFile(cData->pipe[cliente->numero]->hInstancia, cliente->nome, sizeof(cliente->nome), NULL, NULL);
+    _tprintf(TEXT("Nome do cliente %d: %s\n"), cliente->numero+1, cliente->nome);
+    ReleaseMutex(cData->hMutex);
+    
+    inicializarEstrutura(cData, &cliente->dados_jogo);//inicializa toda a estrutura de dados para não ocorrer erros a partilhar
+
+    setStartAndEnd(&cliente->dados_jogo);//define inicio e fim do jogo
+
+    preparar_matriz(&cliente->dados_jogo);//prepara toda a matriz em função do inicio e do fim
+
+    writeMemory(cData);//enviar a informação para o monitor
+
+    cData->hThreads[1] = CreateThread(NULL, 0, aguaFluir, &cliente->dados_jogo, 0, NULL); // iniciar thread que flui a agua
+
+    WaitForMultipleObjects(2, cData->hThreads, TRUE, INFINITE);//esperar fim das threads
+
+    CloseHandle(cData->hThreads[0]);
+    CloseHandle(cData->hThreads[1]);
+
+    Sleep(2000);
+    ResetEvent(cData->pipe[cliente->numero]->overlap.hEvent);
+}
+
+
+void esperarClientes(ControlData * cData) {
+    TCHAR nome[256];
+    PIPES dados;
+    HANDLE hPipe, hThread[MAX_CLI], hEventTemp;
+    int i, numClientes = 0;
+    DWORD offset, nBytes;
+
+    for (int p = 0;  p < MAX_CLI;  p++)
+    {
+        hThread[p] = NULL;
+    }
+
+    for (i = 0; i < MAX_CLI; i++) {
+        //true para o evento estar sinalizado
+        hEventTemp = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (hEventTemp == NULL) {
+            _tprintf(TEXT("\n[ERRO] Criar Evento! (CreateEvent)"));
+            exit(-1);
+        }
+
+        hPipe = CreateNamedPipe(PIPE_NAME,
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+            PIPE_WAIT | PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
+            MAX_CLI, sizeof(CLIENTE), sizeof(CLIENTE), 1000, NULL);
+        
+        if (hPipe == INVALID_HANDLE_VALUE) {
+            _tprintf(TEXT("\n[ERRO] Criar Named Pipe! (CreateNamedPipe)"));
+            exit(-1);
+        }
+        //ZeroMemory(destino, tamanho)
+        //conforme a documentação meter a memoria a estrutura overlap a zero
+        ZeroMemory(&dados.hPipes[i].overlap, sizeof(dados.hPipes[i].overlap));
+        dados.hPipes[i].hInstancia = hPipe;		//handle do pipe
+        dados.hPipes[i].overlap.hEvent = hEventTemp;	//handle do evento (dentro da estrutura)
+        dados.hEvents[i] = hEventTemp;		//handle do evento
+        dados.hPipes[i].activo = FALSE;		//flag de sinalizaçao
+
+        //o segundo parametro é o ponteiro para a estrutura de dados overlap
+        if (ConnectNamedPipe(hPipe, &dados.hPipes[i].overlap)) {
+            _tprintf(TEXT("\n[ERRO] Ligar ao Cliente! (ConnectNamedPipe)"));
+            exit(-1);
+        }
+    }
+   
+
+
+    while (numClientes < MAX_CLI) {
+        _tprintf(TEXT("\nÀ espera de clientes..."));
+
+        //3º parametro FALSE, the function returns when the state of any one of the objects is set to signaled
+
+        offset = WaitForMultipleObjects(MAX_CLI, dados.hEvents, FALSE, INFINITE);
+        i = offset - WAIT_OBJECT_0;
+
+        if (i >= 0 && i < MAX_CLI) {
+            
+            _tprintf(TEXT("\nCliente %d entrou..."), i+1);
+            //identificador para o ficheiro named pipe 
+            //ponteiro para a estrutura overlap
+            //ponteiro para uma variavel que recebe o numero de bytes
+            //true -> se estiver a true e o membro interno da estrutura lpOverlaped for STATUS_PENDING, a funcao nao retornara
+            //false -> e a operaçao ainda estiver pendente, a funcao retornara FALSE e a funcao GetLastError retornara ERROR_I
+
+            if (GetOverlappedResult(dados.hPipes[i].hInstancia,
+                &dados.hPipes[i].overlap, &nBytes, FALSE)) {
+                ResetEvent(dados.hEvents[i]);
+
+                WaitForSingleObject(cData->hMutex, INFINITE);
+                cData->c++;
+                dados.hPipes[i].activo = TRUE;
+                cData->pipe[i] = &dados.hPipes[i];
+                hThread[i] = CreateThread(NULL, 0, threadCliente, cData, 0, NULL);
+                if (hThread == NULL) {
+                    _tprintf(TEXT("\n[ERRO] Criar Thread! (CreateThread)"));
+                    exit(-1);
+                }
+                
+                ReleaseMutex(cData->hMutex);
+                
+            }
+            numClientes++;
+        }
+    }
+    WaitForMultipleObjects(MAX_CLI, hThread, TRUE, INFINITE);
+
+    for (i = 0; i < MAX_CLI; i++) {
+        _tprintf(TEXT("\nDesligar o pipe (DisconnectNamedPipe)"));
+
+        if (!DisconnectNamedPipe(dados.hPipes[i].hInstancia)) {
+            _tprintf(TEXT("\n[ERRO] Desligar o pipe! (DisconnectNamedPipe)"));
+            exit(-1);
+        }
+        CloseHandle(dados.hPipes[i].hInstancia);
+    }
+}
+
 int _tmain(int argc, LPTSTR argv[]) {
     DADOS_JOGO* dados_jogo;
     ControlData cData;
@@ -590,37 +763,26 @@ int _tmain(int argc, LPTSTR argv[]) {
     _setmode(_fileno(stdout), _O_WTEXT);
     _setmode(_fileno(stderr), _O_WTEXT);
 #endif
-    cData.hThreads[0] = NULL;
-    cData.hThreads[1] = NULL;
     hMapFile = NULL;
     cData.escreverPos = 0;
     cData.lerPos = 0;
+    cData.c = 0;
     srand(time(0));
 
     verificar_execução(); // verifica se ja existe servidor 
     iniciarSemaforoMutex(&cData);
     memoria_partilhada(&cData, &hMapFile);//inicia a memoria partilhada
 
-    dados_jogo = &cData.sharedMem->Dados_Partilhados;
-    cData.dados = dados_jogo;
+    verificar_parametros(&argc, argv, &cData);// verifica os parametros da linha de comandos e da regedit
 
-    inicializarEstrutura(dados_jogo);//inicializa toda a estrutura de dados para não ocorrer erros a partilhar
+    //dados_jogo = &cData.sharedMem->Dados_Partilhados;
+    //cData.dados = dados_jogo;
 
-    verificar_parametros(&argc, argv, dados_jogo);// verifica os parametros da linha de comandos e da regedit
+    // verificar clientes aqui
+    esperarClientes(&cData);
 
-    setStartAndEnd(dados_jogo);//define inicio e fim do jogo
-
-    preparar_matriz(dados_jogo);//prepara toda a matriz em função do inicio e do fim
-
-    writeMemory(&cData);//enviar a informação para o monitor
-
-    cData.hThreads[1] = CreateThread(NULL, 0, aguaFluir, &cData, 0, NULL); // iniciar thread que flui a agua
-
-    WaitForMultipleObjects(2, &cData.hThreads, TRUE, INFINITE);//esperar fim das threads
 
     //fechar tudo
-    CloseHandle(cData.hThreads[0]);
-    CloseHandle(cData.hThreads[1]);
     UnmapViewOfFile(cData.sharedMem);
     CloseHandle(hMapFile);
     CloseHandle(cData.hMutex);

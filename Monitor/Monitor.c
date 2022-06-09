@@ -75,7 +75,7 @@ DWORD WINAPI threadRead(LPVOID a) {
         WaitForSingleObject(cData->hReadSM, INFINITE);
         WaitForSingleObject(cData->hMutex, INFINITE);
 
-        printBoard(&cData->sharedMem->Dados_Partilhados);//imprimir a board sempre que receber nova informação
+        printBoard(&cData->sharedMem->clientes[0].dados_jogo);//imprimir a board sempre que receber nova informação
 
         ReleaseMutex(cData->hMutex);
         ReleaseSemaphore(cData->hWriteSM, 1, NULL);
@@ -112,7 +112,7 @@ void memoria_partilhada(ControlData* cData, HANDLE* hThread, HANDLE* hMapFile) {
 
 
     if (first) {
-        cData->sharedMem->Dados_Partilhados.shutdown = 0;
+        cData->shutdown = 0;
         cData->sharedMem->m = 1;
     }
     else {
@@ -181,6 +181,7 @@ int _tmain(int argc, LPTSTR argv[]) {
     _setmode(_fileno(stdout), _O_WTEXT);
     _setmode(_fileno(stderr), _O_WTEXT);
 #endif
+    Sleep(10000);
     hThread = NULL;
     hMapFile = NULL;
     cData.escreverPos = 0;
@@ -188,7 +189,7 @@ int _tmain(int argc, LPTSTR argv[]) {
     iniciarSemaforoMutex(&cData);
     memoria_partilhada(&cData, &hThread, &hMapFile);//iniciar memoria partilhada
 
-    dados_jogo = &cData.sharedMem->Dados_Partilhados;
+    dados_jogo = &cData.sharedMem->clientes[0].dados_jogo;
     cData.dados = dados_jogo;
     lerComandos(&cData);//ler comandos do utilizador
 

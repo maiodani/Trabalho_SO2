@@ -13,6 +13,8 @@
 
 #define BUFFER_SIZE 10
 
+#define MAX_CLI 5
+
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
 enum PATH { START, END, NORMAL };
 
@@ -41,14 +43,21 @@ typedef struct {
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
+typedef struct {
+    int numero;
+    TCHAR nome[TAM];
+    DADOS_JOGO dados_jogo;
+}CLIENTE;
+
 typedef struct _SharedMem {
     int m; //numero de monitores
 
-    DADOS_JOGO Dados_Partilhados;//memoria partilhada do jogo
+    CLIENTE clientes[MAX_CLI];//memoria partilhada do jogo
 
     TCHAR comandos[10][BUFFER_SIZE];// buffer circular para receber comandos
 
 }SharedMem;
+
 
 typedef struct _ControlData {
     HANDLE hMutex;// mutex
@@ -65,7 +74,7 @@ typedef struct _ControlData {
     unsigned int escreverPos;//posição a escrever
     unsigned int lerPos;//posição a ler
 
-
+    int shutdown;
     SharedMem* sharedMem;//memoria partilhada
     DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
 }ControlData;
