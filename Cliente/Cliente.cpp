@@ -1,5 +1,12 @@
 #include <windows.h>
 #include <windowsx.h>
+#include <tchar.h>
+#include <fcntl.h>
+#include <io.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
+
 
 /* ===================================================== */
 /* Programa base (esqueleto) para aplicações Windows     */
@@ -89,8 +96,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 		WS_OVERLAPPEDWINDOW,	// Estilo da janela (WS_OVERLAPPED= normal)
 		CW_USEDEFAULT,		// Posição x pixels (default=à direita da última)
 		CW_USEDEFAULT,		// Posição y pixels (default=abaixo da última)
-		CW_USEDEFAULT,		// Largura da janela (em pixels)
-		CW_USEDEFAULT,		// Altura da janela (em pixels)
+		400,		// Largura da janela (em pixels)
+		400,		// Altura da janela (em pixels)
 		(HWND)HWND_DESKTOP,	// handle da janela pai (se se criar uma a partir de
 						// outra) ou HWND_DESKTOP se a janela for a primeira, 
 						// criada a partir do "desktop"
@@ -165,14 +172,41 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 // WM_DESTROY, WM_CHAR, WM_KEYDOWN, WM_PAINT...) definidas em windows.h
 // ============================================================================
 
+void testecor(int xPos, int yPos, int * l, int * c) {
+	int x1 = 5, x2 = 25;
+	int y1 = 30, y2 = 50;
+
+	for (int i = 0;  i < 10;  i++)
+	{
+		for (int j = 0; j < 10; j++) {
+			if (xPos < x2 && yPos < y2 && xPos > x1 && yPos > y1) {
+				*l = i;
+				*c = j;
+				return;
+			}
+			x1 = x2;
+			x2 = x2 + 20;
+		}
+		y1 = y2;
+		y2 = y2 + 20;
+		x1 = 5, x2 = 25;
+	}
+}
+
+
 LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lParam) {
-	static TCHAR tecla = '?';
+	static TCHAR tecla[10];
 	HDC hdc;
 	RECT rect;
 	int xPos;
 	int yPos;
+	int l = 0;
+	int c = 0;
 	PAINTSTRUCT ps;
 	switch (messg) {
+	case WM_CREATE:
+
+		break;
 	case WM_CLOSE:
 		if (MessageBox(hWnd, TEXT("Tem a certeza que quer sair?"),
 			TEXT("Sair"), MB_ICONQUESTION | MB_YESNO | MB_HELP) == IDYES) {
@@ -181,21 +215,25 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		break;
 
 	case WM_CHAR:
-		tecla = (TCHAR)wParam;
+		tecla[0] = (TCHAR)wParam;
 		break;
 
 	case WM_LBUTTONDOWN:
 		xPos = GET_X_LPARAM(lParam);
 		yPos = GET_Y_LPARAM(lParam);
+		testecor(xPos, yPos, &l, &c);
+
 		hdc = GetDC(hWnd);
 		GetClientRect(hWnd, &rect);
 		SetTextColor(hdc, RGB(255, 255, 255));
 		SetBkMode(hdc, TRANSPARENT);
 		rect.left = xPos;
 		rect.top = yPos;
-		DrawText(hdc, &tecla, 1, &rect, DT_SINGLELINE | DT_NOCLIP);
+		wsprintf(tecla, TEXT("%d %d"), l,c);
+		//DrawText(hdc, tecla, 1, &rect, DT_SINGLELINE | DT_NOCLIP);
+		TextOut(hdc, 5, 5, tecla, _tcslen(tecla));
 		ReleaseDC(hWnd, hdc);
-		InvalidateRect(hWnd, NULL, true); //chama o WM_PAINT
+		//InvalidateRect(hWnd, NULL, true); //chama o WM_PAINT
 		break;
 	case WM_DESTROY:	// Destruir a janela e terminar o programa 
 						// "PostQuitMessage(Exit Status)"		
@@ -204,18 +242,18 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 	case WM_PAINT: {
 		hdc = BeginPaint(hWnd, &ps);
 		int i = 0, j;
-		int Lx1 = 5, Lx2 = 25;
-		int Cy1 = 30, Cy2 = 50;
+		int x1 = 5, x2 = 25;
+		int y1 = 30, y2 = 50;
 		for (j = 0; j < 10; j++)
 		{
 			for (i = 0; i < 10; i++) {
-				Rectangle(hdc, Lx1, Cy1, Lx2, Cy2);
-				Lx1 = Lx2;
-				Lx2 = Lx2 + 20;
+				Rectangle(hdc, x1, y1, x2, y2);
+				x1 = x2;
+				x2 = x2 + 20;
 			}
-			Cy1 = Cy2;
-			Cy2 = Cy2 + 20;
-			Lx1 = 5, Lx2 = 25;
+			y1 = y2;
+			y2 = y2 + 20;
+			x1 = 5, x2 = 25;
 		}
 		EndPaint(hWnd, &ps);
 	}

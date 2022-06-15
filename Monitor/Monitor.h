@@ -1,4 +1,4 @@
-#define TAM 100
+Ôªø#define TAM 100
 #define NOMEMP TEXT("MP")
 
 //MONITOR-SERVIDOR
@@ -13,7 +13,9 @@
 
 #define BUFFER_SIZE 10
 
-#define MAX_CLI 5
+#define MAX_CLI 2
+
+
 
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
 enum PATH { START, END, NORMAL };
@@ -21,32 +23,35 @@ enum PATH { START, END, NORMAL };
 typedef struct {
     int cano_pos; //numero do cano escolhido
     enum Direction entrada_possiveis[2];//sendo 0 entrada 1 e saida, 
-    //inicialmente n„o se sabe mas · medida que a agua ai fluindo ai se sabendo
-    enum PATH path;//se È o inicio o fim ou um espaÁo normal
-    int agua;//se ja foi prenchido com agua 1 = prenchido, 0 = n„o prenchido
+    //inicialmente n√£o se sabe mas √° medida que a agua ai fluindo ai se sabendo
+    enum PATH path;//se √© o inicio o fim ou um espa√ßo normal
+    int agua;//se ja foi prenchido com agua 1 = prenchido, 0 = n√£o prenchido
 }CANO;
 
 
 typedef struct {
     unsigned int shutdown; //terminar jogo
     int code; //codigo que indica estado do jogo para imprimir
-    boolean modoAleatorio; //indica se as peÁas vem aleatÛrias ou n„o
-    int tam_x; //dimens„o x maxima matriz
-    int tam_y; //dimens„o y maxima matriz
-    int tempo_fluir; //tempo apÛs o qual a ·gua comeÁa a fluir
+    boolean modoAleatorio; //indica se as pe√ßas vem aleat√≥rias ou n√£o
+    int tam_x; //dimens√£o x maxima matriz
+    int tam_y; //dimens√£o y maxima matriz
+    int tempo_fluir; //tempo ap√≥s o qual a √°gua come√ßa a fluir
     int sp_x; // x da starting position
     int sp_y; // y da starting position
     int ep_x; // x da ending position
     int ep_y; // y da ending position
     int agua_posY; //pos da agua y
     int agua_posX; //pos da agua x
+    int jogadas[6];
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
 typedef struct {
+    DWORD ID;
     int numero;
     TCHAR nome[TAM];
     DADOS_JOGO dados_jogo;
+    BOOL ativo;
 }CLIENTE;
 
 typedef struct _SharedMem {
@@ -62,7 +67,7 @@ typedef struct _SharedMem {
 typedef struct _ControlData {
     HANDLE hMutex;// mutex
 
-    //SEM¡FOROS
+    //SEM√ÅFOROS
     //monitor-servidor
     HANDLE hWriteMS;// semaforo para escrever MS
     HANDLE hReadMS;// semaforo para ler MS
@@ -71,10 +76,9 @@ typedef struct _ControlData {
     HANDLE hWriteSM;// semaforo para escrever SM
     HANDLE hReadSM;// semaforo para ler SM
 
-    unsigned int escreverPos;//posiÁ„o a escrever
-    unsigned int lerPos;//posiÁ„o a ler
+    unsigned int escreverPos;//posi√ß√£o a escrever
+    unsigned int lerPos;//posi√ß√£o a ler
 
     int shutdown;
     SharedMem* sharedMem;//memoria partilhada
-    DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
 }ControlData;

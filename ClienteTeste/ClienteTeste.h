@@ -16,6 +16,7 @@
 
 #define PIPE_NAME TEXT("\\\\.\\pipe\\clientes")
 
+
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
 enum PATH { START, END, NORMAL };
 
@@ -26,11 +27,6 @@ typedef struct {
     enum PATH path;//se é o inicio o fim ou um espaço normal
     int agua;//se ja foi prenchido com agua 1 = prenchido, 0 = não prenchido
 }CANO;
-
-typedef struct {
-    int numero;
-    TCHAR nome[TAM];
-}CLIENTE_PIPE;
 
 
 typedef struct {
@@ -46,24 +42,18 @@ typedef struct {
     int ep_y; // y da ending position
     int agua_posY; //pos da agua y
     int agua_posX; //pos da agua x
+    int jogadas[6];
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
 typedef struct {
+    DWORD ID;
     int numero;
     TCHAR nome[TAM];
     DADOS_JOGO dados_jogo;
+    BOOL ativo;
 }CLIENTE;
 
-
-typedef struct _SharedMem {
-    int m; //numero de monitores
-
-    DADOS_JOGO Dados_Partilhados;//memoria partilhada do jogo
-
-    TCHAR comandos[10][BUFFER_SIZE];// buffer circular para receber comandos
-
-}SharedMem;
 
 typedef struct _ControlData {
     HANDLE hMutex;// mutex
@@ -82,6 +72,11 @@ typedef struct _ControlData {
 
     HANDLE hThreads[2];//threads
 
-    SharedMem* sharedMem;//memoria partilhada
-    DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
+    CLIENTE* cliente;
+
+    HANDLE* pipe;
+
+    int shutdown;
+
+    //DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
 }ControlData;

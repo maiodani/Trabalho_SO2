@@ -6,46 +6,57 @@
 
 #include "Monitor.h"
 
-void printBoard(DADOS_JOGO* jogo) {
-    TCHAR jogadas[][3] = { _T(" "), _T("━"), _T("┃"), _T("┏"), _T("┓"), _T("┛"), _T("┗") };
-    switch (jogo->code)
+void printBoard(ControlData * cData) {
+    TCHAR jogadas[][3] = { _T(" "), _T("━"), _T("┃"), _T("┏"), _T("┓"), _T("┛"), _T("┗"), _T("□")};
+    for (int r = 0; r < MAX_CLI; r++)
     {
-    case 1:_tprintf(TEXT("\nAgua começou a fluir"));
-        break;
-    case 2:_tprintf(TEXT("\nPerdeu o jogo"));
-        break;
-    case 3:_tprintf(TEXT("\nGanhou o jogo"));
-        break;
-    default:
-        break;
-    }
-    _tprintf(TEXT("\n"));
-    _tprintf(TEXT("\nMAPA: "));
-    _tprintf(TEXT("\n"));
-    _tprintf(TEXT(" x "));
-    for (int k = 0; k < jogo->tam_x; k++) {
-        _tprintf(TEXT("%d "), k + 1);
-    }
-    _tprintf(TEXT("\n"));
-    _tprintf(TEXT("y"));
-    for (int i = 0; i < jogo->tam_y; i++) {
-        _tprintf(TEXT("\n"));
-        _tprintf(TEXT("%d  "), i + 1);
-        for (int j = 0; j < jogo->tam_x; j++) {
-            if (jogo->mapa[i][j].agua == 1) {
-                _tprintf(TEXT("\033[0;36m%s \033[0m"), jogadas[jogo->mapa[i][j].cano_pos]);
+        if (cData->sharedMem->clientes[r].ativo) {
+            _tprintf(TEXT("\nCliente %d : %s"), cData->sharedMem->clientes[r].numero+1, cData->sharedMem->clientes[r].nome);
+            DADOS_JOGO* jogo = &cData->sharedMem->clientes[r].dados_jogo;
+            switch (jogo->code)
+            {
+            case 1:_tprintf(TEXT("\nAgua começou a fluir"));
+                break;
+            case 2:_tprintf(TEXT("\nPerdeu o jogo"));
+                break;
+            case 3:_tprintf(TEXT("\nGanhou o jogo"));
+                break;
+            default:
+                break;
+            }
+            _tprintf(TEXT("\n"));
+            _tprintf(TEXT("\nMAPA: "));
+            _tprintf(TEXT("\n"));
+            _tprintf(TEXT(" x "));
+            for (int k = 0; k < jogo->tam_x; k++) {
+                _tprintf(TEXT("%d "), k + 1);
+            }
+            _tprintf(TEXT("\n"));
+            _tprintf(TEXT("y"));
+            for (int i = 0; i < jogo->tam_y; i++) {
+                _tprintf(TEXT("\n"));
+                _tprintf(TEXT("%d  "), i + 1);
+                for (int j = 0; j < jogo->tam_x; j++) {
+                    if (jogo->mapa[i][j].agua == 1) {
+                        _tprintf(TEXT("a%s"), jogadas[jogo->mapa[i][j].cano_pos]);
+                    }
+                    else {
+                        _tprintf(TEXT("%s "), jogadas[jogo->mapa[i][j].cano_pos]);
+                    }
+                }
+
+            }
+            _tprintf(TEXT("\nSTARTING POINT -> Y:%d X:%d \nENDING POINT -> Y:%d X:%d \n"), jogo->sp_y, jogo->sp_x, jogo->ep_y, jogo->ep_x);
+            _tprintf(TEXT("AGUA ESTA NO PONTO -> Y:%d X:%d\n"), jogo->agua_posY + 1, jogo->agua_posX + 1);
+
+            if (jogo->modoAleatorio) {
+                _tprintf(TEXT("MODO ALEATÓRIO ATIVADO\n"));
             }
             else {
-                _tprintf(TEXT("%s "), jogadas[jogo->mapa[i][j].cano_pos]);
+                _tprintf(TEXT("MODO ALEATÓRIO DESATIVADO\n"));
             }
         }
-
     }
-    _tprintf(TEXT("\nSTARTING POINT -> Y:%d X:%d \nENDING POINT -> Y:%d X:%d \n"), jogo->sp_y, jogo->sp_x, jogo->ep_y, jogo->ep_x);
-    _tprintf(TEXT("AGUA ESTA NO PONTO -> Y:%d X:%d\n"), jogo->agua_posY + 1, jogo->agua_posX + 1);
-
-    _tprintf(TEXT("1: ━ , 2: ┃ , 3: ┏ , 4: ┓ , 5: ┛ , 6: ┗ \n"));
-
 }
 
 void writeMemory(ControlData* cData, TCHAR* comando) {
@@ -71,15 +82,14 @@ void writeMemory(ControlData* cData, TCHAR* comando) {
 
 DWORD WINAPI threadRead(LPVOID a) {
     ControlData* cData = (ControlData*)a;
-    while (cData->dados->shutdown == 0) {
+    while (cData->shutdown == 0) {
         WaitForSingleObject(cData->hReadSM, INFINITE);
         WaitForSingleObject(cData->hMutex, INFINITE);
 
-        printBoard(&cData->sharedMem->clientes[0].dados_jogo);//imprimir a board sempre que receber nova informação
+        printBoard(cData);//imprimir a board sempre que receber nova informação
 
         ReleaseMutex(cData->hMutex);
         ReleaseSemaphore(cData->hWriteSM, 1, NULL);
-
     }
 }
 
@@ -156,9 +166,9 @@ void iniciarSemaforoMutex(ControlData* cData) {
 
 void lerComandos(ControlData* cData) {
     TCHAR buf[TAM];
-
     do {
-        if (cData->dados->shutdown == 1) {
+        _tprintf(TEXT("\ncomando:"));
+        if (cData->shutdown == 1) {
             return;
         }
         ZeroMemory(buf, sizeof(buf));
@@ -181,16 +191,14 @@ int _tmain(int argc, LPTSTR argv[]) {
     _setmode(_fileno(stdout), _O_WTEXT);
     _setmode(_fileno(stderr), _O_WTEXT);
 #endif
-    Sleep(10000);
     hThread = NULL;
     hMapFile = NULL;
     cData.escreverPos = 0;
     cData.lerPos = 0;
+    cData.shutdown = 0;
     iniciarSemaforoMutex(&cData);
     memoria_partilhada(&cData, &hThread, &hMapFile);//iniciar memoria partilhada
 
-    dados_jogo = &cData.sharedMem->clientes[0].dados_jogo;
-    cData.dados = dados_jogo;
     lerComandos(&cData);//ler comandos do utilizador
 
     WaitForSingleObject(hThread, INFINITE);//esperar thread terminar
