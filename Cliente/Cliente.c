@@ -290,29 +290,6 @@ void writeMemory(ControlData * cData, int* l, int* c) {
 	}
 }
 
-DWORD WINAPI aguaFluir(LPVOID c) {
-	ControlData* cData = (ControlData*)c;
-	HDC memDC;
-	RECT rect;
-	HBITMAP hBmp;
-	//while (cData->cliente->dados_jogo.shutdown == 0){
-		//if (cData->cliente->dados_jogo.code == 1) {
-
-			GetClientRect(cData->hWnd, &rect);
-			memDC = CreateCompatibleDC(*cData->hdc);
-			hBmp = CreateCompatibleBitmap(*cData->hdc, rect.right, rect.bottom);
-			SelectObject(memDC, hBmp);
-			DeleteObject(hBmp);
-			FillRect(memDC, &rect, CreateSolidBrush(RGB(0, 0, 255)));
-			
-			rect.right=500;
-			BitBlt(*cData->hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
-			ReleaseDC(cData->hWnd, memDC);
-		//}
-		Sleep(30);
-	//}
-}
-
 DWORD WINAPI comecarCliente(LPVOID c) {
 	ControlData* cData = (ControlData*)c;
 	CLIENTE* cliente;
@@ -354,10 +331,7 @@ DWORD WINAPI comecarCliente(LPVOID c) {
 	HANDLE threadRead = CreateThread(NULL, 0, readPipe, cData, 0, NULL); // iniciar thread que flui a agua
 	writePipe(cData);
 
-	HANDLE threadAguaFluir = CreateThread(NULL, 0, aguaFluir, cData, 0, NULL); // iniciar thread que flui a agua
-
 	WaitForSingleObject(threadRead, INFINITE);
-	WaitForSingleObject(threadAguaFluir, INFINITE);
 
 	CloseHandle(hpipe);
 	CloseHandle(threadRead);
@@ -388,7 +362,7 @@ void getTouchPos(ControlData* cData, int xPos, int yPos, int* l, int* c) {
 	}
 }
 
-void inicializaBMP(HWND hWnd, HDC * bmpDC, BITMAP  * bmp, int cx, int cy) {
+void adicionaBMP(HWND hWnd, HDC * bmpDC, BITMAP  * bmp,int * cano, int x1, int y1, int cx, int cy) {
 	TCHAR canos[][TAM] = {_T("pipes_bmp/reto_esquerda_direita.bmp"), 
 		_T("pipes_bmp/reto_cima_baixo.bmp"), 
 		_T("pipes_bmp/curva_baixo_direita.bmp"),
@@ -399,22 +373,22 @@ void inicializaBMP(HWND hWnd, HDC * bmpDC, BITMAP  * bmp, int cx, int cy) {
 
 	RECT rect;
 	HBITMAP hBmp; 
+	HBITMAP g_hbmMask;
+
 	HDC hdc;
 
+	hdc = GetDC(hWnd);
+	*bmpDC = CreateCompatibleDC(hdc);
+	hBmp = (HBITMAP)LoadImage(NULL, canos[*cano], IMAGE_BITMAP, cx - 2, cy - 2, LR_LOADFROMFILE);
 
-	for (int i = 0; i < 7; i++)
-	{
-		hdc = GetDC(hWnd);
-		hBmp = (HBITMAP)LoadImage(NULL, canos[i], IMAGE_BITMAP, cx - 2, cy - 2, LR_LOADFROMFILE);
+	GetObject(hBmp, sizeof(*bmp), &*bmp);
 
-		GetObject(hBmp, sizeof(bmp[i]), &bmp[i]);
+	SelectObject(*bmpDC, hBmp);
+	BitBlt(hdc, x1, y1, bmp->bmWidth, bmp->bmHeight, *bmpDC, 0, 0, SRCCOPY);
 
-		
-		bmpDC[i] = CreateCompatibleDC(hdc);
-		SelectObject(bmpDC[i], hBmp);
-		ReleaseDC(hWnd, hdc);
-	}
 	
+	ReleaseDC(hWnd, hdc);
+	DeleteDC(*bmpDC);
 }
 
 LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lParam) {
@@ -429,10 +403,11 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 	static boolean game = FALSE;
 	static TCHAR jogadas[][3] = { _T(" "), _T("━"), _T("┃"), _T("┏"), _T("┓"), _T("┛"), _T("┗"), _T("□") };
 	
-	static HDC bmpDC[7];
-	static BITMAP bmp[7];
+	static HDC bmpDC;
+	static BITMAP bmp;
 	HBITMAP hBmp;
-	HDC teste;
+	HBITMAP g_hbmBall = NULL, g_hbmMask = NULL;
+	static HDC aguaDC = NULL;
 	
 	static int xBitmap;
 	static int yBitmap;
@@ -459,7 +434,10 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		cData.hdc = &hdc;
 		cData.cliente = &cliente;
 		cData.hWnd = hWnd;
+		cData.memDC = &memDC;
+		cData.aguaDC = &aguaDC;
 		cData.hMutex = hMutex = CreateMutex(NULL, FALSE, NULL);
+
 		nameLabel = CreateWindow(TEXT("STATIC"),
 			TEXT("NOME:"),
 			WS_CHILD | WS_VISIBLE,
@@ -484,7 +462,6 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			(HMENU) 1,
 			NULL,
 			NULL);
-
 		break;
 	case WM_CLOSE:
 		if (MessageBox(hWnd, TEXT("Tem a certeza que quer sair?"),
@@ -553,7 +530,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 				return;
 			}
 			GetClientRect(hWnd, &rect);
-			inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
+			//inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
 
 			game = TRUE;
 			InvalidateRect(hWnd, NULL, TRUE); //chama o WM_PAINT
@@ -583,7 +560,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 
 			ShowWindow(waitLabel, SW_HIDE);
 			GetClientRect(hWnd, &rect);
-			inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
+			//inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
 
 			game = TRUE;
 			InvalidateRect(hWnd, NULL, TRUE); //chama o WM_PAINT
@@ -636,14 +613,32 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		break;
 	case WM_ERASEBKGND:
 		return 1;
+
 	case WM_PAINT: {
-		
 
 		hdc = BeginPaint(hWnd, &ps);
 
+		RECT auxRect;
 		GetClientRect(hWnd, &rect);
 
-		
+		if (aguaDC == NULL) {
+			aguaDC = CreateCompatibleDC(hdc);
+			hBmp = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+			SelectObject(aguaDC, hBmp);
+			DeleteObject(hBmp);
+			FillRect(aguaDC, &rect, CreateSolidBrush(RGB(0, 0, 255)));
+
+
+			/*
+			//NÃO APAGAR ISTO
+			for (int i = 0; i < 2; i++)
+			{
+				rect.right = 100*(i+1);
+				rect.bottom = 100*(i+1);
+				BitBlt(memDC, i*100, i * 100, rect.right, rect.bottom, aguaDC, 0, 0, SRCCOPY);
+				
+			}*/
+		}
 		FillRect(hdc, &rect, CreateSolidBrush(RGB(255, 255, 255)));
 		/*
 		BitBlt(*dados->memDC, *dados->xBitmap, *dados->yBitmap,
@@ -651,10 +646,9 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			//SRCCOPY - Copies the source rectangle directly to the destination rectangle.
 			*/
 		if (game) {
-			
-
 
 			GetClientRect(hWnd, &rect);
+			GetClientRect(hWnd, &auxRect);
 			if (cliente.dados_jogo.jogarCom != -2) {
 				ZeroMemory(buf, TAM);
 				wsprintf(buf, TEXT("A Jogar conta o cliente %d"), cliente.dados_jogo.jogarCom+1);
@@ -673,7 +667,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 				Rectangle(hdc, x1, 0, x2, (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
 				
 				int pos = cData.cliente->dados_jogo.jogadas[i] - 1;
-				BitBlt(hdc, x1 + 1, 0 + 1, bmp[pos].bmWidth, bmp[pos].bmHeight, bmpDC[pos], 0, 0, SRCCOPY);
+				adicionaBMP(hWnd, &bmpDC, &bmp, &pos, x1 + 1, 1, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
 				x1 = x2;
 				x2 = x2 + (rect.right / (cData.cliente->dados_jogo.tam_x + 2));
 			}
@@ -687,8 +681,16 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 					int pos = cData.cliente->dados_jogo.mapa[i][j].cano_pos - 1;
 					if (pos != -1) {
 
-						BitBlt(hdc, x1 + 1, y1 + 1, bmp[pos].bmWidth, bmp[pos].bmHeight, bmpDC[pos], 0, 0, SRCCOPY);
-						//agua a correr AQUI
+
+						//BitBlt(hdc, x1 + 1, y1 + 1, bmp[pos].bmWidth, bmp[pos].bmHeight, bmpDC[pos], 0, 0, SRCCOPY);
+						adicionaBMP(hWnd, &bmpDC, &bmp, &pos, x1 + 1, y1 + 1, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
+						if (cData.cliente->dados_jogo.mapa[i][j].agua == 1) {
+							//auxRect.right = 100 * (i + 1);
+							//auxRect.bottom = 100 * (i + 1);
+							BitBlt(hdc, x1 + 1, y1 + 1, bmp.bmWidth, bmp.bmHeight, aguaDC, 0, 0, SRCPAINT);
+
+							//FillRect(hdc, &rect, CreateSolidBrush(RGB(255, 255, 255)));
+						}
 					}
 					x1 = x2;
 					x2 = x2 + (rect.right / (cData.cliente->dados_jogo.tam_x + 2));
@@ -698,11 +700,10 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 				x1 = (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), x2 = x1 + (rect.right / (cData.cliente->dados_jogo.tam_x + 2));
 			}
 
-			
 		}
 		//ReleaseDC(hWnd, memDC);
-		BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
-		ReleaseDC(hWnd, hdc);
+		//BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
+		//ReleaseDC(hWnd, hdc);
 		EndPaint(hWnd, &ps);
 
 		

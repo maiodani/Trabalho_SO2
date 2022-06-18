@@ -75,5 +75,7 @@ typedef struct _ControlData {
     HWND hWnd;
 
     HDC* hdc;
+    HDC* memDC;
+    HDC* aguaDC;
     //DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
 }ControlData;

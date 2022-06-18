@@ -133,6 +133,7 @@ typedef struct {
     HANDLE threadAguaFluir;
     HANDLE threadReadPipe;
     HANDLE hReady;// semaforo mandar cliente esperar até pipes estarem prontos
+
     CLIENTE* cliente;
 
     ControlData* cData;

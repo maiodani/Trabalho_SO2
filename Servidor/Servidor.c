@@ -404,7 +404,11 @@ void execComandoMonitor(TCHAR* comando, ControlData* cData) {
                 i++;
             }
             if (_tcscmp(op[0], TEXT("wall")) == 0) {
-                int y = 0, x = 0, j = 0;
+                int y = 0, x = 0;
+                if (!(isNumber(op[1]) && isNumber(op[2]))) {
+                    _tprintf(TEXT("\nParamêtros Inválidos"));
+                    return;
+                }
                 y = _ttoi(op[1]);
                 x = _ttoi(op[2]);
                 if ((y > dados->tam_y || y < 1) || (x > dados->tam_x && x < 1)) {//VERIFICA SE POSICAO É VALIDA
@@ -423,6 +427,7 @@ void execComandoMonitor(TCHAR* comando, ControlData* cData) {
                 }
                 else {
                     _tprintf(TEXT("\nParamêtros Inválidos"));
+                    return;
                 }
             }
             else if (_tcscmp(op[0], TEXT("random")) == 0) {
@@ -436,15 +441,8 @@ void execComandoMonitor(TCHAR* comando, ControlData* cData) {
                 }
                 else{
                     _tprintf(TEXT("\nParamêtros Inválidos"));
+                    return;
                 }
-            }
-            else if (_tcscmp(op[0], TEXT("quit")) == 0) {
-                _tprintf(TEXT("\nComando Reconhecido"));
-                _tprintf(TEXT("\nA terminar.."));
-                //cData->dados->shutdown = 1;
-                ReleaseMutex(cData->hMutex);
-                ReleaseSemaphore(cData->hReadMS, 1, NULL);
-                //TerminateThread(cData->hThreads[1], NULL);
             }
             else {
                 _tprintf(TEXT("\nComando não Reconhecido"));
@@ -594,7 +592,6 @@ DWORD WINAPI aguaFluir(LPVOID a) {
                 return;
             }
         }
-        writeCliente(data);
         Sleep(data->cData->pausa_agua);
         dados->code = 1;
         data->cData->pausa_agua = 0;
@@ -768,26 +765,6 @@ void verificarAdversario(CLIENTE_THREAD_DATA* data) {
         }
         Sleep(1000);
     }
-    /*
-    if ((!cData->sharedMem->clientes[i].ativo) && i == MAX_CLI - 1 || cData->sharedMem->clientes[i].dados_jogo.jogarCom != -1) {
-
-        while ((!cData->sharedMem->clientes[i].ativo) || cData->sharedMem->clientes[i].dados_jogo.jogarCom == -2)
-        {
-            Sleep(1000);
-        }
-        if (cData->sharedMem->clientes[i].numero != data->cliente->numero) {
-            cData->sharedMem->clientes[i].dados_jogo.jogarCom = data->cliente->numero;
-
-            writeCliente(data);
-        }
-    }
-    else {
-        if (cData->sharedMem->clientes[i].numero != data->cliente->numero && cData->sharedMem->clientes[i].dados_jogo.jogarCom == -1) {
-            cData->sharedMem->clientes[i].dados_jogo.jogarCom = data->cliente->numero;
-            writeCliente(data);
-        }
-
-    }*/
 }
 
 void execComandoCliente(TCHAR * comando, CLIENTE * cliente, CLIENTE_THREAD_DATA * data) {
@@ -1140,11 +1117,7 @@ int _tmain(int argc, LPTSTR argv[]) {
 
     verificar_parametros(&argc, argv, &cData);// verifica os parametros da linha de comandos e da regedit
 
-   
-
-    //dados_jogo = &cData.sharedMem->Dados_Partilhados;
-    //cData.dados = dados_jogo;
-
+  
     // verificar clientes aqui
     esperarClientes(&cData);
 
