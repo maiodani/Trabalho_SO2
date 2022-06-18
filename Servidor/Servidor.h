@@ -1,4 +1,4 @@
-﻿#define TAM 100
+﻿#define TAM 256
 #define NOMEMP TEXT("MP")
 
 //MONITOR-SERVIDOR
@@ -11,6 +11,8 @@
 
 #define WRITE_CLIENT_NAME TEXT("WRITE_CLIENT")
 
+#define READY_NAME TEXT("CLIENTE%dCANREAD")
+
 #define MUTEX_NAME TEXT("MUTEX_SERVIDOR")
 
 #define BUFFER_SIZE 10
@@ -21,7 +23,7 @@
 
 
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
-enum PATH { START, END, NORMAL };
+enum PATH { START, END, WALL, NORMAL };
 
 typedef struct {
     int cano_pos; //numero do cano escolhido
@@ -45,6 +47,8 @@ typedef struct {
     int agua_posY; //pos da agua y
     int agua_posX; //pos da agua x
     int jogadas[6];
+    int jogarCom;
+    int nivel;
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
@@ -94,7 +98,9 @@ typedef struct _ControlData {
     HANDLE hWriteSM;// semaforo para escrever SM
     HANDLE hReadSM;// semaforo para ler SM
 
-    HANDLE hWriteClient;// semaforo para ler SM
+    HANDLE hWriteClient;// semaforo para mandar escrever no cliente
+
+    
 
     unsigned int escreverPos;//posição a escrever
     unsigned int lerPos;//posição a ler
@@ -123,6 +129,10 @@ typedef struct {
     HANDLE pipe_servidor_cliente;
     HANDLE pipe_cliente_servidor;
 
+    HANDLE threadWritePipe;
+    HANDLE threadAguaFluir;
+    HANDLE threadReadPipe;
+    HANDLE hReady;// semaforo mandar cliente esperar até pipes estarem prontos
     CLIENTE* cliente;
 
     ControlData* cData;

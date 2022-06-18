@@ -1,5 +1,4 @@
-#pragma once
-#define TAM 100
+#define TAM 256
 #define NOMEMP TEXT("MP")
 
 //MONITOR-SERVIDOR
@@ -15,7 +14,7 @@
 #define BUFFER_SIZE 10
 
 #define PIPE_NAME TEXT("\\\\.\\pipe\\clientes")
-
+ 
 
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
 enum PATH { START, END, NORMAL };

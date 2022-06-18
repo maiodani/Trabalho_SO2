@@ -313,7 +313,6 @@ void defineEntradas(int* c, enum Direction* ep) {
 }
 
 void addCano(int * y, int * x, DADOS_JOGO* dados) {
-    srand(time(0));
     dados->mapa[*y][*x].cano_pos = dados->jogadas[0];
     dados->mapa[*y][*x].agua = 0;
     defineEntradas(&(dados->mapa[*y][*x].cano_pos), &(dados->mapa[*y][*x].entrada_possiveis));//define as entradas possiveis consoante o cano que for
@@ -337,6 +336,7 @@ void addCano(int * y, int * x, DADOS_JOGO* dados) {
 void addParede(int * y, int* x, DADOS_JOGO* dados) {
     dados->mapa[*y][*x].cano_pos = 7;
     dados->mapa[*y][*x].agua = 0;
+    dados->mapa[*y][*x].path = WALL;
     dados->mapa[*y][*x].entrada_possiveis[0] = NOTHING;
     dados->mapa[*y][*x].entrada_possiveis[1] = NOTHING;
 }
@@ -346,8 +346,10 @@ void writeCliente(CLIENTE_THREAD_DATA* data) {
 }
 
 void writeMonitor(ControlData* cData) {
-    WaitForSingleObject(cData->hWriteSM, INFINITE);
-    ReleaseSemaphore(cData->hReadSM, cData->sharedMem->m, NULL);
+    if (cData->sharedMem->m != 0) {
+        WaitForSingleObject(cData->hWriteSM, INFINITE);
+        ReleaseSemaphore(cData->hReadSM, cData->sharedMem->m, NULL);
+    }
 }
 
 void writeAll(ControlData* cData) {
@@ -500,10 +502,7 @@ void memoria_partilhada(ControlData* cData, HANDLE* hMapFile) {
         cData->sharedMem->m = 0;
     }
 
-
-
     cData->hThreadRead = CreateThread(NULL, 0, threadRead, cData, 0, NULL);
-
 }
 
 BOOL verificaContinuidade(enum Direction d1, enum Direction d2) {
@@ -541,17 +540,63 @@ BOOL verificaContinuidade(enum Direction d1, enum Direction d2) {
     }
 }
 
+void inicializarEstrutura(CLIENTE_THREAD_DATA* data) {
+    ControlData* cData = data->cData;
+    CLIENTE* cliente = data->cliente;
+    DADOS_JOGO* dados_jogo = &cliente->dados_jogo;
+    cliente->ID = 0;
+    cliente->numero = 0;
+    cliente->ativo = FALSE;
+    dados_jogo->agua_posX = 0;
+    dados_jogo->agua_posY = 0;
+    dados_jogo->ep_x = 0;
+    dados_jogo->ep_y = 0;
+    dados_jogo->sp_x = 0;
+    dados_jogo->sp_y = 0;
+    dados_jogo->jogarCom = -2;
+    dados_jogo->nivel = 1;
+    dados_jogo->tam_x = cData->tam_x;
+    dados_jogo->tam_y = cData->tam_y;
+    dados_jogo->tempo_fluir = cData->tempo_fluir;
+    dados_jogo->modoAleatorio = FALSE;
+    for (int i = 0; i < 6; i++)
+    {
+        dados_jogo->jogadas[i] = 0;
+    }
+    for (int i = 0; i < 20; i++)
+    {
+        for (int j = 0; j < 20; j++)
+        {
+            dados_jogo->mapa[i][j].cano_pos = 0;
+            dados_jogo->mapa[i][j].entrada_possiveis[0] = NOTHING;
+            dados_jogo->mapa[i][j].entrada_possiveis[1] = NOTHING;
+            dados_jogo->mapa[i][j].path = NORMAL;
+            dados_jogo->mapa[i][j].agua = 0;
+        }
+    }
 
+}
 
 DWORD WINAPI aguaFluir(LPVOID a) {
     CLIENTE_THREAD_DATA* data = (CLIENTE_THREAD_DATA*)a;
     DADOS_JOGO* dados = &data->cliente->dados_jogo;
     Sleep(dados->tempo_fluir);
     _tprintf(TEXT("\nÁgua começou fluir"));
-    dados->code = 1;
-
+    dados->code = 0;
     while (dados->shutdown == 0) {
+        if (dados->jogarCom != -2) {
+            if (data->cData->sharedMem->clientes[data->cliente->dados_jogo.jogarCom].dados_jogo.code == 3) {
+                _tprintf(TEXT("\nPerdeu jogo"));
+                dados->code = 2;
+                dados->shutdown = 1;
+                writeCliente(data);
+                writeMonitor(data->cData);
+                return;
+            }
+        }
+        writeCliente(data);
         Sleep(data->cData->pausa_agua);
+        dados->code = 1;
         data->cData->pausa_agua = 0;
         enum Direction aux_change_order;
         int pos_entrada = -1;
@@ -585,7 +630,49 @@ DWORD WINAPI aguaFluir(LPVOID a) {
                 if (y == (dados->ep_y - 1) && x == (dados->ep_x - 1)) {
                     _tprintf(TEXT("\nGanhou jogo"));
                     dados->code = 3;
-                    dados->shutdown = 1;
+
+                    
+                    if (dados->jogarCom == -2)
+                    {
+                        pos_entrada = 0;
+                        
+                        writeCliente(data);
+                        writeMonitor(data->cData);
+                        if (dados->nivel == 5) {
+                            dados->shutdown = 1;
+                        }
+                        else {
+                            for (int i1 = 0; i1 < 20; i1++)
+                            {
+                                for (int j1 = 0; j1 < 20; j1++)
+                                {
+                                    dados->mapa[i1][j1].cano_pos = 0;
+                                    dados->mapa[i1][j1].entrada_possiveis[0] = NOTHING;
+                                    dados->mapa[i1][j1].entrada_possiveis[1] = NOTHING;
+                                    dados->mapa[i1][j1].path = NORMAL;
+                                    dados->mapa[i1][j1].agua = 0;
+                                }
+                            }
+                            preparar_pecas(dados);
+
+                            setStartAndEnd(dados);//define inicio e fim do jogo
+
+                            preparar_matriz(dados);//prepara toda a matriz em função do inicio e do fim
+                            dados->code = 1;
+                            writeCliente(data);
+                            writeMonitor(data->cData);
+                            _tprintf(TEXT("\nÁgua começou fluir"));
+                            Sleep(dados->tempo_fluir);
+                        }
+                        dados->nivel++;
+                    }
+                    else {
+                        writeCliente(data);
+                        writeMonitor(data->cData);
+                        return;
+                    }
+                   
+                    
                     /*
                     ReleaseMutex(cData->hMutex);
                     ReleaseSemaphore(cData->hReadMS, 1, NULL);*/
@@ -603,45 +690,29 @@ DWORD WINAPI aguaFluir(LPVOID a) {
             dados->code = 2;
             dados->shutdown = 1;
         }
+        
         writeCliente(data);
         writeMonitor(data->cData);
-        dados->code = 0;
-        Sleep(4000);
-    }
-}
-
-void inicializarEstrutura(ControlData * cData) {
-    for (int k = 0; k < MAX_CLI; k++)
-    {
-        CLIENTE* cliente = &cData->sharedMem->clientes[k];
-        DADOS_JOGO* dados_jogo = &cliente->dados_jogo;
-        cliente->ID = 0;
-        cliente->numero = 0;
-        cliente->ativo = FALSE;
-        dados_jogo->agua_posX = 0;
-        dados_jogo->agua_posY = 0;
-        dados_jogo->ep_x = 0;
-        dados_jogo->ep_y = 0;
-        dados_jogo->sp_x = 0;
-        dados_jogo->sp_y = 0;
-        dados_jogo->tam_x = cData->tam_x;
-        dados_jogo->tam_y = cData->tam_y;
-        dados_jogo->tempo_fluir = cData->tempo_fluir;
-        dados_jogo->modoAleatorio = FALSE;
-        for (int i = 0; i < 6; i++)
+        dados->code = 1;
+        switch (dados->nivel)
         {
-            dados_jogo->jogadas[i] = 0;
-        }
-        for (int i = 0; i < 20; i++)
-        {
-            for (int j = 0; j < 20; j++)
-            {
-                dados_jogo->mapa[i][j].cano_pos = 0;
-                dados_jogo->mapa[i][j].entrada_possiveis[0] = NOTHING;
-                dados_jogo->mapa[i][j].entrada_possiveis[1] = NOTHING;
-                dados_jogo->mapa[i][j].path = NORMAL;
-                dados_jogo->mapa[i][j].agua = 0;
-            }
+        case 1:
+            Sleep(5000);
+            break;
+        case 2:
+            Sleep(4000);
+            break;
+        case 3:
+            Sleep(3000);
+            break;
+        case 4:
+            Sleep(2000);
+            break;
+        case 5:
+            Sleep(1000);
+            break;
+        default:
+            break;
         }
     }
 }
@@ -652,6 +723,7 @@ void iniciarSemaforoMutex(ControlData* cData) {
         _tprintf(TEXT("\nErro no CreateMutex Servidor."));
         return 1;
     }
+    
 
     cData->hWriteClient = CreateSemaphore(NULL, 0, BUFFER_SIZE, WRITE_CLIENT_NAME);
 
@@ -678,8 +750,48 @@ void iniciarSemaforoMutex(ControlData* cData) {
     }
 }
 
+void verificarAdversario(CLIENTE_THREAD_DATA* data) {
+    ControlData* cData = data->cData;
+    TCHAR buf[TAM];
+    while (1) {
+        for (int i = 0; i < MAX_CLI; i++)
+        {
+            if (cData->sharedMem->clientes[i].ativo) {
+                if (cData->sharedMem->clientes[i].numero != data->cliente->numero) {
+                    if (cData->sharedMem->clientes[i].dados_jogo.jogarCom != -2) {
+                        data->cliente->dados_jogo.jogarCom = cData->sharedMem->clientes[i].numero;
+                        writeCliente(data);
+                        return 0;
+                    }
+                }
+            }
+        }
+        Sleep(1000);
+    }
+    /*
+    if ((!cData->sharedMem->clientes[i].ativo) && i == MAX_CLI - 1 || cData->sharedMem->clientes[i].dados_jogo.jogarCom != -1) {
 
-void execComandoCliente(TCHAR * comando, CLIENTE * cliente, ControlData * cData) {
+        while ((!cData->sharedMem->clientes[i].ativo) || cData->sharedMem->clientes[i].dados_jogo.jogarCom == -2)
+        {
+            Sleep(1000);
+        }
+        if (cData->sharedMem->clientes[i].numero != data->cliente->numero) {
+            cData->sharedMem->clientes[i].dados_jogo.jogarCom = data->cliente->numero;
+
+            writeCliente(data);
+        }
+    }
+    else {
+        if (cData->sharedMem->clientes[i].numero != data->cliente->numero && cData->sharedMem->clientes[i].dados_jogo.jogarCom == -1) {
+            cData->sharedMem->clientes[i].dados_jogo.jogarCom = data->cliente->numero;
+            writeCliente(data);
+        }
+
+    }*/
+}
+
+void execComandoCliente(TCHAR * comando, CLIENTE * cliente, CLIENTE_THREAD_DATA * data) {
+    ControlData* cData = data->cData;
     if (!_tcscmp(comando, TEXT("\0"))) {
         return;
     }
@@ -698,35 +810,41 @@ void execComandoCliente(TCHAR * comando, CLIENTE * cliente, ControlData * cData)
         tokens = _tcstok_s(NULL, TEXT(" "), aux);
         i++;
     }
+    _tprintf(TEXT("\nCliente %s"), cliente->nome);
     if (_tcscmp(op[0], TEXT("add")) == 0) {
         int y = 0, x = 0;
         y = _ttoi(op[1]);
         x = _ttoi(op[2]);
         //_tprintf(TEXT("|%d||%d||%d||%d| \n"),y, cData->dados->tam_y,x, cData->dados->tam_x);
-        if ((y > dados->tam_y || y < 1) || (x > dados->tam_x && x < 1)) {//VERIFICA SE POSICAO É VALIDA
+        if ((y > dados->tam_y || y < 0) || (x > dados->tam_x && x < 0)) {//VERIFICA SE POSICAO É VALIDA
             _tprintf(TEXT("\nPosição Inválida\n"));
             return;
         }
-        y--;
-        x--;
+        if (dados->mapa[y][x].path != NORMAL) {
+            _tprintf(TEXT("\nImpossivel substituir saida, entrada e paredes\n"));
+            return;
+        }
+
         _tprintf(TEXT("\nComando Reconhecido"));
+        
         addCano(&y, &x, dados);
     }
+    else if (_tcscmp(op[0], TEXT("nextLevel")) == 0) {
+        dados->nivel++;
+        _tprintf(TEXT("\nComando Reconhecido"));
+        _tprintf(TEXT("\nProximo nivel"));
+    }
+
     else if (_tcscmp(op[0], TEXT("quit")) == 0) {
         _tprintf(TEXT("\nComando Reconhecido"));
-        _tprintf(TEXT("\nA terminar.."));
-        //cData->dados->shutdown = 1;
-        ReleaseMutex(cData->hMutex);
-        ReleaseSemaphore(cData->hReadMS, 1, NULL);
-        //TerminateThread(cData->hThreads[1], NULL);
+        _tprintf(TEXT("\nA terminar cliente %s.."), cliente->nome);
     }
+
     else {
         _tprintf(TEXT("\nComando não Reconhecido"));
         return;
-
     }
 
-    
 }
 
 DWORD WINAPI writePipes(LPVOID a) {
@@ -739,20 +857,23 @@ DWORD WINAPI writePipes(LPVOID a) {
 
 DWORD WINAPI readPipe(LPVOID a) {
     CLIENTE_THREAD_DATA* data = (CLIENTE_THREAD_DATA*)a;
+    DWORD n;
     TCHAR buf[TAM];
-    wsprintf(data->name_cliente_servidor, TEXT("\\\\.\\pipe\\CLIENTE_%d_WRITE"), data->cliente->ID);
-
+    ReleaseSemaphore(data->hReady, 1, NULL);
     if (!ConnectNamedPipe(data->pipe_cliente_servidor, NULL)) {
         _tprintf(TEXT("\n[ERRO] Ligar ao Cliente read! (ConnectNamedPipe)"));
         exit(-1);
     }
-    
+    WaitForSingleObject(data->hReady, INFINITE);
     do{
-        ReadFile(data->pipe_cliente_servidor, buf, TAM, NULL, NULL);
-        execComandoCliente(buf, data->cliente, data->cData);
+        ReadFile(data->pipe_cliente_servidor, buf, sizeof(buf), &n, NULL);
+        buf[n / sizeof(TCHAR)] = '\0';
+        execComandoCliente(buf, data->cliente, data);
         writeMonitor(data->cData);
         writeCliente(data);
     } while (_tcscmp(buf, TEXT("quit")));
+    TerminateThread(data->threadWritePipe, NULL);
+    TerminateThread(data->threadAguaFluir, NULL);
 }
 
 void inicializarPipes(CLIENTE_THREAD_DATA * data) {
@@ -762,7 +883,7 @@ void inicializarPipes(CLIENTE_THREAD_DATA * data) {
     data->pipe_cliente_servidor = CreateNamedPipe(data->name_cliente_servidor,
         PIPE_ACCESS_INBOUND,
         PIPE_WAIT | PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
-        1, TAM * sizeof(TCHAR), TAM * sizeof(TCHAR), NULL, NULL);
+        2, TAM, TAM, 1000, NULL);
 
     if (data->pipe_cliente_servidor == INVALID_HANDLE_VALUE) {
         _tprintf(TEXT("\n[ERRO] Criar Named Pipe! (CreateNamedPipe)"));
@@ -778,7 +899,7 @@ void inicializarPipes(CLIENTE_THREAD_DATA * data) {
     data->pipe_servidor_cliente = CreateNamedPipe(data->name_servidor_cliente,
         PIPE_ACCESS_OUTBOUND,
         PIPE_WAIT | PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
-        1, sizeof(DADOS_JOGO), TAM * sizeof(DADOS_JOGO), NULL, NULL);
+        2, sizeof(DADOS_JOGO), sizeof(DADOS_JOGO), 1000, NULL);
 
     if (data->pipe_servidor_cliente == INVALID_HANDLE_VALUE) {
         _tprintf(TEXT("\n[ERRO] Criar Named Pipe! (CreateNamedPipe)"));
@@ -792,22 +913,33 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     ControlData* cData = (ControlData*)d;
     CLIENTE_THREAD_DATA data;
     srand(time(0));
+
+    
     WaitForSingleObject(cData->hMutex, INFINITE);
     data.pipe_cliente_servidor = NULL;
     data.pipe_servidor_cliente = NULL;
 
     CLIENTE* cliente = &cData->sharedMem->clientes[cData->c - 1];
+    data.cData = cData;
+    data.cliente = cliente;
+    
+    inicializarEstrutura(&data);//inicializa toda a estrutura de dados para não ocorrer erros a partilhar
+    
+    
     cliente->numero = cData->c - 1;
     cliente->ativo = TRUE;
-    data.cliente = cliente;
+    
 
-    data.cData = cData;
+    
     ReleaseMutex(cData->hMutex);
 
     DWORD n;
-    int i;
     BOOL ret;
-    HANDLE threadAguaFluir = NULL, threadReadPipe = NULL, threadWritePipe =  NULL;
+    TCHAR buf[TAM];
+    TCHAR semName[TAM];
+
+
+    
 
     setStartAndEnd(&cliente->dados_jogo);//define inicio e fim do jogo
 
@@ -816,33 +948,74 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     preparar_pecas(&cliente->dados_jogo);
 
     WriteFile(cData->pipe[cliente->numero]->hInstancia, cliente, sizeof(*cliente), NULL, NULL);
-   
+
+    
     ret = ReadFile(cData->pipe[cliente->numero]->hInstancia, cliente, sizeof(*cliente), NULL, NULL);
     _tprintf(TEXT("\nNome do cliente %d: %s ID: %d"), cliente->numero + 1, cliente->nome, cliente->ID);
+    wsprintf(semName, READY_NAME, data.cliente->ID);
+    data.hReady = CreateSemaphore(NULL, 0, BUFFER_SIZE, semName);
+
+    
+    WaitForSingleObject(cData->hMutex, INFINITE);
 
     inicializarPipes(&data);
+    
 
-    threadReadPipe = CreateThread(NULL, 0, readPipe, &data, 0, NULL);
-    threadWritePipe = CreateThread(NULL, 0, writePipes, &data, 0, NULL);
+    //Sleep(2000);
+
+    data.threadReadPipe = CreateThread(NULL, 0, readPipe, &data, 0, NULL);
+    
+    
     if (!ConnectNamedPipe(data.pipe_servidor_cliente, NULL)) {
         _tprintf(TEXT("\n[ERRO] Ligar ao Cliente!  write(ConnectNamedPipe)"));
         exit(-1);
     }
+    
+    data.threadWritePipe = CreateThread(NULL, 0, writePipes, &data, 0, NULL);
+    
+    writeCliente(&data);//enviar a informação para o clinte
+    ReleaseMutex(cData->hMutex);
+    
+    //WaitForSingleObject(cData->hMutex, INFINITE);
+    
+    ReadFile(data.pipe_cliente_servidor, buf, sizeof(buf), &n, NULL);
+    buf[n / sizeof(TCHAR)] = '\0';
 
-    threadAguaFluir = CreateThread(NULL, 0, aguaFluir, &data, 0, NULL); // iniciar thread que flui a agua
+    _tprintf(TEXT("\n%s"), buf);
+    if (!_tcscmp(buf, TEXT("link"))) {
+        data.cliente->dados_jogo.jogarCom = -1;
+        verificarAdversario(&data);
+    }else if (!_tcscmp(buf, TEXT("quit"))) {
+        data.cliente->dados_jogo.shutdown = 1;
+    }
+
+    ReleaseSemaphore(data.hReady, 1, NULL);
+    //ReleaseMutex(cData->hMutex);
+    
+    data.threadAguaFluir = CreateThread(NULL, 0, aguaFluir, &data, 0, NULL); // iniciar thread que flui a agua
+
 
     writeCliente(&data);//enviar a informação para o clinte
     writeMonitor(cData);
 
-    WaitForSingleObject(threadAguaFluir, INFINITE);
-    WaitForSingleObject(threadReadPipe, INFINITE);
-    WaitForSingleObject(threadWritePipe, INFINITE);
+    WaitForSingleObject(data.threadAguaFluir, INFINITE);
+    WaitForSingleObject(data.threadReadPipe, INFINITE);
+    WaitForSingleObject(data.threadWritePipe, INFINITE);
 
-    CloseHandle(threadAguaFluir);
-    CloseHandle(threadReadPipe);
-    CloseHandle(threadWritePipe);
+    if (!DisconnectNamedPipe(data.pipe_cliente_servidor)) {
+        _tprintf(TEXT("[ERRO] Desligar o pipe! (DisconnectNamedPipe)\n"));
+        exit(-1);
+    }
+    if (!DisconnectNamedPipe(data.pipe_servidor_cliente)) {
+        _tprintf(TEXT("[ERRO] Desligar o pipe! (DisconnectNamedPipe)\n"));
+        exit(-1);
+    }
+    CloseHandle(data.pipe_cliente_servidor);
+    CloseHandle(data.pipe_servidor_cliente);
 
-    Sleep(2000);
+    CloseHandle(data.threadAguaFluir);
+    CloseHandle(data.threadReadPipe);
+    CloseHandle(data.threadWritePipe);
     ResetEvent(cData->pipe[cliente->numero]->overlap.hEvent);
 }
 
@@ -967,7 +1140,7 @@ int _tmain(int argc, LPTSTR argv[]) {
 
     verificar_parametros(&argc, argv, &cData);// verifica os parametros da linha de comandos e da regedit
 
-    inicializarEstrutura(&cData);//inicializa toda a estrutura de dados para não ocorrer erros a partilhar
+   
 
     //dados_jogo = &cData.sharedMem->Dados_Partilhados;
     //cData.dados = dados_jogo;

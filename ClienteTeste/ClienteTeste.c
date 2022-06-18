@@ -89,6 +89,7 @@ DWORD WINAPI readPipe(LPVOID a) {
 		_tprintf(TEXT("RECEBI\n"));
 		printBoard(cData->cliente);
 	}
+	CloseHandle(hpipe);
 }
 
 DWORD WINAPI writePipe(LPVOID a) {
@@ -117,11 +118,15 @@ DWORD WINAPI writePipe(LPVOID a) {
 			return;
 		}
 		_tprintf(TEXT("\nInsira:"));
-		ZeroMemory(buf, sizeof(buf));
 		_fgetts(buf, TAM, stdin);
 		buf[_tcslen(buf) - 1] = '\0';
-		WriteFile(hpipe, buf, TAM, NULL, NULL);
+		if (!WriteFile(hpipe, buf, (DWORD)_tcslen(buf) * sizeof(TCHAR), NULL, NULL)) {
+			_tprintf(TEXT("[ERRO] Escrever no pipe! (WriteFile)\n"));
+		}
+	
 	} while (_tcscmp(buf, TEXT("quit")));
+
+	CloseHandle(hpipe);
 }
 
 int _tmain(int argc, LPTSTR argv[]) {

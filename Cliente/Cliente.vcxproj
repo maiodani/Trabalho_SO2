@@ -133,7 +133,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Cliente.cpp" />
+    <ClCompile Include="Cliente.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Cliente.rc" />

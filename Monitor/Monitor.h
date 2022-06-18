@@ -1,4 +1,4 @@
-﻿#define TAM 100
+﻿#define TAM 256
 #define NOMEMP TEXT("MP")
 
 //MONITOR-SERVIDOR
@@ -18,7 +18,7 @@
 
 
 enum Direction { UP, DOWN, LEFT, RIGHT, NOTHING };
-enum PATH { START, END, NORMAL };
+enum PATH { START, END, WALL, NORMAL };
 
 typedef struct {
     int cano_pos; //numero do cano escolhido
@@ -43,6 +43,8 @@ typedef struct {
     int agua_posY; //pos da agua y
     int agua_posX; //pos da agua x
     int jogadas[6];
+    int jogarCom;
+    int nivel;
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
