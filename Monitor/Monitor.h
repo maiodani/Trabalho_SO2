@@ -58,7 +58,7 @@ typedef struct {
 
 typedef struct _SharedMem {
     int m; //numero de monitores
-
+    int shutdown;
     CLIENTE clientes[MAX_CLI];//memoria partilhada do jogo
 
     TCHAR comandos[10][BUFFER_SIZE];// buffer circular para receber comandos

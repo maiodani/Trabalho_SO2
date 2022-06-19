@@ -107,18 +107,18 @@ void verificar_parametros(int* argc, LPTSTR* argv, ControlData* cData) {
     }
 
     RegQueryInfoKey(
-        chave,                    // key handle 
-        NULL,                // buffer for class name 
-        NULL,           // size of class string 
-        NULL,                    // reserved 
-        &cSubKeys,               // number of subkeys 
-        NULL,            // longest subkey size 
-        NULL,            // longest class string 
-        &cValues,                // number of values for this key 
-        NULL,            // longest value name 
-        NULL,         // longest value data 
-        NULL,   // security descriptor 
-        NULL);       // last write time 
+        chave,
+        NULL,
+        NULL,
+        NULL,
+        &cSubKeys,
+        NULL,
+        NULL,
+        &cValues,
+        NULL,
+        NULL,
+        NULL,
+        NULL);       
 
 
     if (*argc == 4) {
@@ -228,7 +228,6 @@ void setStartAndEnd(DADOS_JOGO* dados) {
 }
 
 void decidirDirecaoInicioFim(DADOS_JOGO* dados, int y, int x, enum PATH flag) {
-    //DADOS_JOGO* dados = (DADOS_JOGO*)dadospt;
     int tam_y = dados->tam_y - 1, tam_x = dados->tam_x - 1;
     int entrada = 0;
     int saida = 1;
@@ -498,6 +497,7 @@ void memoria_partilhada(ControlData* cData, HANDLE* hMapFile) {
     if (first) {
         cData->shutdown = 0;
         cData->sharedMem->m = 0;
+        cData->sharedMem->shutdown = 0;
     }
 
     cData->hThreadRead = CreateThread(NULL, 0, threadRead, cData, 0, NULL);
@@ -572,7 +572,6 @@ void inicializarEstrutura(CLIENTE_THREAD_DATA* data) {
             dados_jogo->mapa[i][j].agua = 0;
         }
     }
-
 }
 
 DWORD WINAPI aguaFluir(LPVOID a) {
@@ -586,6 +585,14 @@ DWORD WINAPI aguaFluir(LPVOID a) {
             if (data->cData->sharedMem->clientes[data->cliente->dados_jogo.jogarCom].dados_jogo.code == 3) {
                 _tprintf(TEXT("\nPerdeu jogo"));
                 dados->code = 2;
+                dados->shutdown = 1;
+                writeCliente(data);
+                writeMonitor(data->cData);
+                return;
+            }
+            if (data->cData->sharedMem->clientes[data->cliente->dados_jogo.jogarCom].dados_jogo.code == 2) {
+                _tprintf(TEXT("\Ganhou o jogo"));
+                dados->code = 3;
                 dados->shutdown = 1;
                 writeCliente(data);
                 writeMonitor(data->cData);
@@ -668,11 +675,6 @@ DWORD WINAPI aguaFluir(LPVOID a) {
                         writeMonitor(data->cData);
                         return;
                     }
-                   
-                    
-                    /*
-                    ReleaseMutex(cData->hMutex);
-                    ReleaseSemaphore(cData->hReadMS, 1, NULL);*/
                 }
                 break;
             }
@@ -686,6 +688,7 @@ DWORD WINAPI aguaFluir(LPVOID a) {
             _tprintf(TEXT("\nPerdeu jogo"));
             dados->code = 2;
             dados->shutdown = 1;
+            return;
         }
         
         writeCliente(data);
@@ -720,7 +723,6 @@ void iniciarSemaforoMutex(ControlData* cData) {
         _tprintf(TEXT("\nErro no CreateMutex Servidor."));
         return 1;
     }
-    
 
     cData->hWriteClient = CreateSemaphore(NULL, 0, BUFFER_SIZE, WRITE_CLIENT_NAME);
 
@@ -776,23 +778,24 @@ void execComandoCliente(TCHAR * comando, CLIENTE * cliente, CLIENTE_THREAD_DATA 
     DADOS_JOGO* dados = &cliente->dados_jogo;
 
     TCHAR* tokens;
-    //comando[_tcslen(comando) - 1] = '\0';
     TCHAR** aux = malloc(sizeof(TCHAR*) * 10);
     tokens = _tcstok_s(comando, TEXT(" "), aux);
     TCHAR* op[10];
     int i = 0;
     while (tokens != NULL) {
         op[i] = tokens;
-        //_tprintf(TEXT("|%s| \n"), tokens);
         tokens = _tcstok_s(NULL, TEXT(" "), aux);
         i++;
     }
     _tprintf(TEXT("\nCliente %s"), cliente->nome);
     if (_tcscmp(op[0], TEXT("add")) == 0) {
         int y = 0, x = 0;
+        if (!(isNumber(op[1]) && isNumber(op[2]))) {
+            _tprintf(TEXT("\nParamêtros Inválidos"));
+            return;
+        }
         y = _ttoi(op[1]);
         x = _ttoi(op[2]);
-        //_tprintf(TEXT("|%d||%d||%d||%d| \n"),y, cData->dados->tam_y,x, cData->dados->tam_x);
         if ((y > dados->tam_y || y < 0) || (x > dados->tam_x && x < 0)) {//VERIFICA SE POSICAO É VALIDA
             _tprintf(TEXT("\nPosição Inválida\n"));
             return;
@@ -801,10 +804,41 @@ void execComandoCliente(TCHAR * comando, CLIENTE * cliente, CLIENTE_THREAD_DATA 
             _tprintf(TEXT("\nImpossivel substituir saida, entrada e paredes\n"));
             return;
         }
+        if (dados->mapa[y][x].agua == 1) {
+            _tprintf(TEXT("\nImpossivel substituir um cano com agua\n"));
+            return;
+        }
 
         _tprintf(TEXT("\nComando Reconhecido"));
         
         addCano(&y, &x, dados);
+    }
+    else if (_tcscmp(op[0], TEXT("clean")) == 0) {
+        int y = 0, x = 0;
+        if (!(isNumber(op[1]) && isNumber(op[2]))) {
+            _tprintf(TEXT("\nParamêtros Inválidos"));
+            return;
+        }
+        y = _ttoi(op[1]);
+        x = _ttoi(op[2]);
+        if ((y > dados->tam_y || y < 0) || (x > dados->tam_x && x < 0)) {//VERIFICA SE POSICAO É VALIDA
+            _tprintf(TEXT("\nPosição Inválida\n"));
+            return;
+        }
+        if (dados->mapa[y][x].path != NORMAL) {
+            _tprintf(TEXT("\nImpossivel substituir saida, entrada e paredes\n"));
+            return;
+        }
+        if (dados->mapa[y][x].agua == 1) {
+            _tprintf(TEXT("\nImpossivel substituir um cano com agua\n"));
+            return;
+        }
+        dados->mapa[y][x].cano_pos = 0;
+        dados->mapa[y][x].path = NORMAL;
+        dados->mapa[y][x].entrada_possiveis[0] = NOTHING;
+        dados->mapa[y][x].entrada_possiveis[1] = NOTHING;
+        
+        _tprintf(TEXT("\nComando Reconhecido"));
     }
     else if (_tcscmp(op[0], TEXT("nextLevel")) == 0) {
         dados->nivel++;
@@ -821,7 +855,6 @@ void execComandoCliente(TCHAR * comando, CLIENTE * cliente, CLIENTE_THREAD_DATA 
         _tprintf(TEXT("\nComando não Reconhecido"));
         return;
     }
-
 }
 
 DWORD WINAPI writePipes(LPVOID a) {
@@ -868,7 +901,6 @@ void inicializarPipes(CLIENTE_THREAD_DATA * data) {
     }
 
 
-
     //WRITE
 
     wsprintf(data->name_servidor_cliente, TEXT("\\\\.\\pipe\\CLIENTE_%d_READ"), data->cliente->ID);
@@ -882,7 +914,6 @@ void inicializarPipes(CLIENTE_THREAD_DATA * data) {
         _tprintf(TEXT("\n[ERRO] Criar Named Pipe! (CreateNamedPipe)"));
         exit(-1);
     }
-
 }
 
 
@@ -906,7 +937,6 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     cliente->numero = cData->c - 1;
     cliente->ativo = TRUE;
     
-
     
     ReleaseMutex(cData->hMutex);
 
@@ -914,9 +944,6 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     BOOL ret;
     TCHAR buf[TAM];
     TCHAR semName[TAM];
-
-
-    
 
     setStartAndEnd(&cliente->dados_jogo);//define inicio e fim do jogo
 
@@ -936,9 +963,6 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     WaitForSingleObject(cData->hMutex, INFINITE);
 
     inicializarPipes(&data);
-    
-
-    //Sleep(2000);
 
     data.threadReadPipe = CreateThread(NULL, 0, readPipe, &data, 0, NULL);
     
@@ -953,7 +977,6 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     writeCliente(&data);//enviar a informação para o clinte
     ReleaseMutex(cData->hMutex);
     
-    //WaitForSingleObject(cData->hMutex, INFINITE);
     
     ReadFile(data.pipe_cliente_servidor, buf, sizeof(buf), &n, NULL);
     buf[n / sizeof(TCHAR)] = '\0';
@@ -967,7 +990,6 @@ DWORD WINAPI threadCliente(LPVOID* d) {
     }
 
     ReleaseSemaphore(data.hReady, 1, NULL);
-    //ReleaseMutex(cData->hMutex);
     
     data.threadAguaFluir = CreateThread(NULL, 0, aguaFluir, &data, 0, NULL); // iniciar thread que flui a agua
 
@@ -1010,7 +1032,6 @@ void esperarClientes(ControlData * cData) {
     }
 
     for (i = 0; i < MAX_CLI; i++) {
-        //true para o evento estar sinalizado
         hEventTemp = CreateEvent(NULL, TRUE, FALSE, NULL);
         if (hEventTemp == NULL) {
             _tprintf(TEXT("\n[ERRO] Criar Evento! (CreateEvent)"));
@@ -1026,28 +1047,24 @@ void esperarClientes(ControlData * cData) {
             _tprintf(TEXT("\n[ERRO] Criar Named Pipe! (CreateNamedPipe)"));
             exit(-1);
         }
-        //ZeroMemory(destino, tamanho)
-        //conforme a documentação meter a memoria a estrutura overlap a zero
-        ZeroMemory(&dados.hPipes[i].overlap, sizeof(dados.hPipes[i].overlap));
-        dados.hPipes[i].hInstancia = hPipe;		//handle do pipe
-        dados.hPipes[i].overlap.hEvent = hEventTemp;	//handle do evento (dentro da estrutura)
-        dados.hEvents[i] = hEventTemp;		//handle do evento
-        dados.hPipes[i].activo = FALSE;		//flag de sinalizaçao
 
-        //o segundo parametro é o ponteiro para a estrutura de dados overlap
+   
+        ZeroMemory(&dados.hPipes[i].overlap, sizeof(dados.hPipes[i].overlap));
+        dados.hPipes[i].hInstancia = hPipe;
+        dados.hPipes[i].overlap.hEvent = hEventTemp;
+        dados.hEvents[i] = hEventTemp;
+        dados.hPipes[i].activo = FALSE;
+
         if (ConnectNamedPipe(hPipe, &dados.hPipes[i].overlap)) {
             _tprintf(TEXT("\n[ERRO] Ligar ao Cliente! (ConnectNamedPipe) %d"), GetLastError());
             Sleep(10000);
             exit(-1);
         }
     }
-   
 
 
     while (numClientes < MAX_CLI) {
         _tprintf(TEXT("\nÀ espera de clientes..."));
-
-        //3º parametro FALSE, the function returns when the state of any one of the objects is set to signaled
 
         offset = WaitForMultipleObjects(MAX_CLI, dados.hEvents, FALSE, INFINITE);
         i = offset - WAIT_OBJECT_0;
@@ -1055,11 +1072,6 @@ void esperarClientes(ControlData * cData) {
         if (i >= 0 && i < MAX_CLI) {
             
             _tprintf(TEXT("\nCliente %d entrou..."), i+1);
-            //identificador para o ficheiro named pipe 
-            //ponteiro para a estrutura overlap
-            //ponteiro para uma variavel que recebe o numero de bytes
-            //true -> se estiver a true e o membro interno da estrutura lpOverlaped for STATUS_PENDING, a funcao nao retornara
-            //false -> e a operaçao ainda estiver pendente, a funcao retornara FALSE e a funcao GetLastError retornara ERROR_I
 
             if (GetOverlappedResult(dados.hPipes[i].hInstancia,
                 &dados.hPipes[i].overlap, &nBytes, FALSE)) {
@@ -1091,7 +1103,13 @@ void esperarClientes(ControlData * cData) {
             exit(-1);
         }
         CloseHandle(dados.hPipes[i].hInstancia);
+        CloseHandle(hThread[i]);
     }
+    cData->shutdown = 1;
+    cData->sharedMem->shutdown = 1;
+
+    ReleaseSemaphore(cData->hReadMS, 1, NULL);
+    writeMonitor(cData);
 }
 
 int _tmain(int argc, LPTSTR argv[]) {
@@ -1120,9 +1138,9 @@ int _tmain(int argc, LPTSTR argv[]) {
   
     // verificar clientes aqui
     esperarClientes(&cData);
-
+    
+    
     WaitForSingleObject(cData.hThreadRead, INFINITE);
-
     //fechar tudo
     UnmapViewOfFile(cData.sharedMem);
     CloseHandle(hMapFile);

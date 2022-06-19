@@ -68,7 +68,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 	wcApp.hIcon = LoadIcon(NULL, IDI_ASTERISK);   // "hIcon" = handler do ícon normal
 										   // "NULL" = Icon definido no Windows
 										   // "IDI_AP..." Ícone "aplicação"
-	wcApp.hIconSm = LoadIcon(NULL, IDI_INFORMATION); // "hIconSm" = handler do ícon pequeno
+	wcApp.hIconSm = LoadIcon(NULL, IDI_APPLICATION); // "hIconSm" = handler do ícon pequeno
 										   // "NULL" = Icon definido no Windows
 										   // "IDI_INF..." Ícon de informação
 	wcApp.hCursor = LoadCursor(NULL, IDC_ARROW);	// "hCursor" = handler do cursor (rato) 
@@ -195,17 +195,15 @@ DWORD WINAPI readPipe(LPVOID a) {
 	TCHAR buf[TAM];
 	TCHAR mensagem[TAM];
 	
-	while (1) {
+	while (cData->cliente->dados_jogo.shutdown == 0) {
 		if (!ReadFile(cData->readPipe, &cData->cliente->dados_jogo, sizeof(cData->cliente->dados_jogo), NULL, NULL)) {
 			exit(-1);
 		}
 		switch (cData->cliente->dados_jogo.code)
 		{
-		case 1:_tprintf(TEXT("\nAgua começou a fluir"));
-			break;
 		case 2:		
 			if (cData->cliente->dados_jogo.jogarCom != -2) {
-				wsprintf(mensagem, TEXT("Perdeu o 1vs1"));
+				wsprintf(mensagem, TEXT("Cliente %s Perdeu o 1vs1"), cData->cliente->nome);
 			}
 			else {
 				wsprintf(mensagem, TEXT("Perdeu o jogo"));
@@ -246,7 +244,9 @@ DWORD WINAPI readPipe(LPVOID a) {
 				}
 			}
 			else {
-				if (MessageBox(cData->hWnd, TEXT("Ganhou o 1vs1"),
+				ZeroMemory(mensagem, TAM);
+				wsprintf(mensagem, TEXT("Cliente %s Ganhou o 1vs1"), cData->cliente->nome);
+				if (MessageBox(cData->hWnd, mensagem,
 					TEXT("Sair"), MB_ICONEXCLAMATION | MB_OK) == IDOK) {
 					wsprintf(buf, TEXT("quit\0"));
 					if (!WriteFile(cData->writePipe, buf, (DWORD)_tcslen(buf) * sizeof(TCHAR), NULL, NULL)) {
@@ -325,7 +325,6 @@ DWORD WINAPI comecarCliente(LPVOID c) {
 	TCHAR semName[TAM];
 	wsprintf(semName, READY_NAME, cliente->ID);
 	cData->hReady = CreateSemaphore(NULL, 0, BUFFER_SIZE, semName);
-	cData->pipe = &hpipe;
 
 	WaitForSingleObject(cData->hReady, INFINITE);
 	HANDLE threadRead = CreateThread(NULL, 0, readPipe, cData, 0, NULL); // iniciar thread que flui a agua
@@ -335,7 +334,6 @@ DWORD WINAPI comecarCliente(LPVOID c) {
 
 	CloseHandle(hpipe);
 	CloseHandle(threadRead);
-
 }
 
 void getTouchPos(ControlData* cData, int xPos, int yPos, int* l, int* c) {
@@ -399,24 +397,13 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 	static HANDLE nameButton;
 	static HANDLE opButton1, opButton2, opButton3;
 	static HANDLE waitLabel;
-	static TCHAR tecla[10];
 	static boolean game = FALSE;
 	static TCHAR jogadas[][3] = { _T(" "), _T("━"), _T("┃"), _T("┏"), _T("┓"), _T("┛"), _T("┗"), _T("□") };
-	
 	static HDC bmpDC;
 	static BITMAP bmp;
 	HBITMAP hBmp;
-	HBITMAP g_hbmBall = NULL, g_hbmMask = NULL;
 	static HDC aguaDC = NULL;
-	
-	static int xBitmap;
-	static int yBitmap;
-
-	TCHAR buf[TAM];;
-	static HANDLE hMutex;
-
-	static int salto;
-	boolean first = TRUE;
+	TCHAR buf[TAM];
 
 	HDC hdc;
 	RECT rect;
@@ -425,7 +412,6 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 	int l = 0;
 	int c = 0;
 	PAINTSTRUCT ps;
-	int op = 0;
 
 	static HDC memDC = NULL;
 	switch (messg) {
@@ -434,9 +420,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		cData.hdc = &hdc;
 		cData.cliente = &cliente;
 		cData.hWnd = hWnd;
-		cData.memDC = &memDC;
-		cData.aguaDC = &aguaDC;
-		cData.hMutex = hMutex = CreateMutex(NULL, FALSE, NULL);
+		cData.hMutex = CreateMutex(NULL, FALSE, NULL);
 
 		nameLabel = CreateWindow(TEXT("STATIC"),
 			TEXT("NOME:"),
@@ -516,8 +500,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 					(HMENU)4,
 					NULL,
 					NULL);
-				//UpdateWindow(hWnd);
-				//InvalidateRect(hWnd, NULL, TRUE);
+
 			}
 			break;
 		case 2:
@@ -530,8 +513,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 				return;
 			}
 			GetClientRect(hWnd, &rect);
-			//inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
-
+			
 			game = TRUE;
 			InvalidateRect(hWnd, NULL, TRUE); //chama o WM_PAINT
 			break;
@@ -560,7 +542,7 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 
 			ShowWindow(waitLabel, SW_HIDE);
 			GetClientRect(hWnd, &rect);
-			//inicializaBMP(hWnd, &bmpDC, &bmp, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
+			
 
 			game = TRUE;
 			InvalidateRect(hWnd, NULL, TRUE); //chama o WM_PAINT
@@ -578,11 +560,6 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			break;
 		}
 		break;
-		/*
-	case WM_CHAR:
-		tecla[0] = (TCHAR)wParam;
-		break;
-		*/
 	case WM_LBUTTONDOWN:
 		xPos = GET_X_LPARAM(lParam);
 		yPos = GET_Y_LPARAM(lParam);
@@ -590,25 +567,26 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 		if (l != -1 && c != -1) {
 			writeMemory(&cData, &l, &c);
 		}
-		
-		/*
-		hdc = GetDC(hWnd);
-		GetClientRect(hWnd, &rect);
-		SetTextColor(hdc, RGB(0, 0, 0));
-		//SetBkMode(hdc, TRANSPARENT);
-		rect.left = xPos;
-		rect.top = yPos;
-		wsprintf(tecla, TEXT("%d %d"), l, c);
-		//DrawText(hdc, tecla, 1, &rect, DT_SINGLELINE | DT_NOCLIP);
-		TextOut(hdc, 5, 5, tecla, _tcslen(tecla));
-		ReleaseDC(hWnd, hdc);*/
-		//InvalidateRect(hWnd, NULL, TRUE); //chama o WM_PAINT
+		break;
+	case WM_RBUTTONDOWN:
+		xPos = GET_X_LPARAM(lParam);
+		yPos = GET_Y_LPARAM(lParam);
+		getTouchPos(&cData, xPos, yPos, &l, &c);
+		if (l != -1 && c != -1) {
+			wsprintf(buf, TEXT("clean %d %d\0"),l,c);
+			if (!WriteFile(cData.writePipe, buf, (DWORD)_tcslen(buf) * sizeof(TCHAR), NULL, NULL)) {
+				return;
+			}
+		}
 		break;
 	case WM_DESTROY:	// Destruir a janela e terminar o programa 
 		wsprintf(buf, TEXT("quit"));
 		if (!WriteFile(cData.writePipe, buf, (DWORD)_tcslen(buf) * sizeof(TCHAR), NULL, NULL)) {
 			exit(-1);
 		}				// "PostQuitMessage(Exit Status)"		
+		CloseHandle(cData.writePipe);
+		CloseHandle(cData.hMutex);
+		CloseHandle(cData.hReady);
 		PostQuitMessage(0);
 		break;
 	case WM_ERASEBKGND:
@@ -627,24 +605,10 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			SelectObject(aguaDC, hBmp);
 			DeleteObject(hBmp);
 			FillRect(aguaDC, &rect, CreateSolidBrush(RGB(0, 0, 255)));
-
-
-			/*
-			//NÃO APAGAR ISTO
-			for (int i = 0; i < 2; i++)
-			{
-				rect.right = 100*(i+1);
-				rect.bottom = 100*(i+1);
-				BitBlt(memDC, i*100, i * 100, rect.right, rect.bottom, aguaDC, 0, 0, SRCCOPY);
-				
-			}*/
 		}
+
 		FillRect(hdc, &rect, CreateSolidBrush(RGB(255, 255, 255)));
-		/*
-		BitBlt(*dados->memDC, *dados->xBitmap, *dados->yBitmap,
-			dados->bmp.bmWidth, dados->bmp.bmHeight, dados->bmpDC, 0, 0, SRCCOPY);// we can call BitBlt() to copy the image from our Memory DC to the Window DC, thus displaying on the screen
-			//SRCCOPY - Copies the source rectangle directly to the destination rectangle.
-			*/
+
 		if (game) {
 
 			GetClientRect(hWnd, &rect);
@@ -677,19 +641,12 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			for (int i = 0; i < cData.cliente->dados_jogo.tam_y; i++) {
 				for (int j = 0; j < cData.cliente->dados_jogo.tam_x; j++) {
 					Rectangle(hdc, x1, y1, x2, y2);
-					//TextOut(hdc, x1+1, y1+1, jogadas[cData.cliente->dados_jogo.mapa[i][j].cano_pos], _tcslen(jogadas[cData.cliente->dados_jogo.mapa[i][j].cano_pos]));
+					
 					int pos = cData.cliente->dados_jogo.mapa[i][j].cano_pos - 1;
 					if (pos != -1) {
-
-
-						//BitBlt(hdc, x1 + 1, y1 + 1, bmp[pos].bmWidth, bmp[pos].bmHeight, bmpDC[pos], 0, 0, SRCCOPY);
 						adicionaBMP(hWnd, &bmpDC, &bmp, &pos, x1 + 1, y1 + 1, (rect.right / (cData.cliente->dados_jogo.tam_x + 2)), (rect.bottom / (cData.cliente->dados_jogo.tam_y + 2)));
 						if (cData.cliente->dados_jogo.mapa[i][j].agua == 1) {
-							//auxRect.right = 100 * (i + 1);
-							//auxRect.bottom = 100 * (i + 1);
 							BitBlt(hdc, x1 + 1, y1 + 1, bmp.bmWidth, bmp.bmHeight, aguaDC, 0, 0, SRCPAINT);
-
-							//FillRect(hdc, &rect, CreateSolidBrush(RGB(255, 255, 255)));
 						}
 					}
 					x1 = x2;
@@ -701,21 +658,14 @@ LRESULT CALLBACK TrataEventos(HWND hWnd, UINT messg, WPARAM wParam, LPARAM lPara
 			}
 
 		}
-		//ReleaseDC(hWnd, memDC);
-		//BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
-		//ReleaseDC(hWnd, hdc);
+
 		EndPaint(hWnd, &ps);
-
-		
-
 		
 		break;
 	}
 	default:
-		// Neste exemplo, para qualquer outra mensagem (p.e. "minimizar","maximizar","restaurar")
-		// não é efectuado nenhum processamento, apenas se segue o "default" do Windows
 		return(DefWindowProc(hWnd, messg, wParam, lParam));
-		break;  // break tecnicamente desnecessário por causa do return
+		break;
 	}
 	return(0);
 }

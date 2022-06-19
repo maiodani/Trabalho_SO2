@@ -87,6 +87,7 @@ DWORD WINAPI threadRead(LPVOID a) {
         WaitForSingleObject(cData->hMutex, INFINITE);
 
         printBoard(cData);//imprimir a board sempre que receber nova informação
+        cData->shutdown = cData->sharedMem->shutdown;
 
         ReleaseMutex(cData->hMutex);
         ReleaseSemaphore(cData->hWriteSM, 1, NULL);
@@ -104,7 +105,7 @@ void memoria_partilhada(ControlData* cData, HANDLE* hThread, HANDLE* hMapFile) {
         NOMEMP);
 
     if (*hMapFile == NULL) {
-        _tprintf(TEXT("VOU CRIAR NOVO FICHEIRO MAPEADO"));
+        _tprintf(TEXT("\nVOU CRIAR NOVO FICHEIRO MAPEADO"));
         *hMapFile = CreateFileMapping(
             INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(SharedMem), NOMEMP);
         first = TRUE;
@@ -124,6 +125,7 @@ void memoria_partilhada(ControlData* cData, HANDLE* hThread, HANDLE* hMapFile) {
     if (first) {
         cData->shutdown = 0;
         cData->sharedMem->m = 1;
+        cData->sharedMem->shutdown = 0;
     }
     else {
         cData->sharedMem->m++;
@@ -167,10 +169,10 @@ void iniciarSemaforoMutex(ControlData* cData) {
 void lerComandos(ControlData* cData) {
     TCHAR buf[TAM];
     do {
-        _tprintf(TEXT("\ncomando:"));
-        if (cData->shutdown == 1) {
+        if (cData->sharedMem->shutdown == 1) {
             return;
         }
+        _tprintf(TEXT("\ncomando:"));
         ZeroMemory(buf, sizeof(buf));
         _fgetts(buf, TAM, stdin);
         writeMemory(cData, buf);//envia o comando para o servidor

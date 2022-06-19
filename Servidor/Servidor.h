@@ -52,8 +52,6 @@ typedef struct {
     CANO mapa[20][20]; // mapa do jogo
 }DADOS_JOGO;
 
-
-
 typedef struct {
     DWORD ID;
     int numero;
@@ -63,17 +61,14 @@ typedef struct {
 }CLIENTE;
 
 
-
 typedef struct _SharedMem {
     int m; //numero de monitores
-
+    int shutdown;
     CLIENTE clientes[MAX_CLI];//memoria partilhada do jogo
 
     TCHAR comandos[10][BUFFER_SIZE];// buffer circular para receber comandos
 
 }SharedMem;
-
-
 
 typedef struct {
     HANDLE hInstancia;
@@ -108,7 +103,6 @@ typedef struct _ControlData {
     HANDLE hThreadRead;//threads
 
     SharedMem* sharedMem;//memoria partilhada
-    //DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
 
     DADOSPIPES* pipe[MAX_CLI];
     

@@ -1,15 +1,5 @@
-
 #include "resource.h"
-#define TAM 100
-#define NOMEMP TEXT("MP")
-
-//MONITOR-SERVIDOR
-#define MS_WRITE_NAME TEXT("MS_WRITE")
-#define MS_READ_NAME TEXT("MS_READ")
-
-//SERVIDOR-MONITOR
-#define SM_WRITE_NAME TEXT("SM_WRITE")
-#define SM_READ_NAME TEXT("SM_READ")
+#define TAM 256
 
 #define READY_NAME TEXT("CLIENTE%dCANREAD")
 
@@ -63,19 +53,14 @@ typedef struct {
 typedef struct _ControlData {
     HANDLE hMutex;// mutex
 
-
-    HANDLE hThreads[2];//threads
-
     CLIENTE* cliente;
+
     HANDLE hReady;// semaforo mandar cliente esperar até pipes estarem prontos
 
-    HANDLE* pipe;
     HANDLE readPipe;
     HANDLE writePipe;
     HWND hWnd;
 
     HDC* hdc;
-    HDC* memDC;
-    HDC* aguaDC;
-    //DADOS_JOGO* dados; //dados do jogo(para evitar chamar muitos parametros)
+
 }ControlData;
